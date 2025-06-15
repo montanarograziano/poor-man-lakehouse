@@ -25,11 +25,14 @@ test:
 
 # Launch docker compose
 up:
-    docker compose up --build --detach
+  {{just_executable()}} needs docker
+  docker compose up --build --detach
 
 # Stop docker compose
 down:
-    docker compose down
+  {{just_executable()}} needs docker
+  docker compose down
+
 
 # Commit with conventional commits
 @commit:
