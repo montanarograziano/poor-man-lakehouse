@@ -23,6 +23,14 @@ lint:
 test:
     uv run pytest tests
 
+# Launch docker compose
+up:
+    docker compose up --build --detach
+
+# Stop docker compose
+down:
+    docker compose down
+
 # Commit with conventional commits
 @commit:
     uv run cz commit
