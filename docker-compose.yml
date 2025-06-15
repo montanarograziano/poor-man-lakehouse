@@ -1,0 +1,95 @@
+services:
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001" # Minio Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: miniopassword
+    volumes:
+      - ./configs/minio/data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  postgres_db:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: unity_catalog_db
+      POSTGRES_USER: uc_user
+      POSTGRES_PASSWORD: uc_password
+    volumes:
+      - ./configs/postgres/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uc_user -d unity_catalog_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  unity_catalog_server:
+    image: unitycatalog/unitycatalog:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./unity_catalog/etc/conf:/opt/unitycatalog/etc/conf # Custom Unity Catalog config
+      - ./unity_catalog/etc/data:/opt/unitycatalog/etc/data # Custom Unity Catalog data
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  spark-master:
+    image: bitnami/spark:4.0.0
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    hostname: spark-master
+    ports:
+      - "8081:8080" # Spark Master UI
+      - "7077:7077" # Spark Master internal communication
+      - "10000:10000" # Spark Connect
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
+      SPARK_DRIVER_PORT: 7001
+      SPARK_BLOCKMGR_PORT: 7002
+      SPARK_WORKER_PORT: 7003
+      # Minio credentials for Spark to access S3-compatible storage
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: miniopassword
+      AWS_ENDPOINT: http://minio:9000
+      # Spark configs for Minio (S3A) and Unity Catalog
+      SPARK_CONF_DIR: /opt/spark/conf
+    volumes:
+      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
+    # depends_on:
+    #   minio:
+    #     condition: service_healthy
+    # healthcheck:
+    #   # Check if the Spark Master UI is reachable
+    #   test: ["CMD", "curl", "-f", "http://localhost:8081"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 20s # Give Spark Master time to start its UI
+
+  spark-worker:
+    image: bitnami/spark:4.0.0
+    hostname: spark-worker
+    command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
+      # Minio credentials for Spark worker
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: miniopassword
+      AWS_ENDPOINT: http://minio:9000
+      SPARK_CONF_DIR: /opt/spark/conf
+    volumes:
+      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
+    # depends_on:
+    #   spark-master:
+    #     condition: service_healthy
