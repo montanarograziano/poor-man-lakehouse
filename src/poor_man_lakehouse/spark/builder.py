@@ -8,7 +8,6 @@ from poor_man_lakehouse.config import settings
 
 
 class SparkBuilder(ABC):
-    # Shared root_builder for all subclasses
     root_builder = SparkSession.builder.appName("Poor Man Lakehouse").master(
         settings.SPARK_MASTER
     )
@@ -37,11 +36,18 @@ class IcebergNessieSparkBuilder(SparkBuilder):
     """Builder for Spark session with Iceberg and Nessie support."""
 
     def get_spark_session(self) -> SparkSession:
+        extra_packages = [
+            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.13:1.9.1",
+            "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.13:0.104.2",
+            "org.apache.hadoop:hadoop-aws:3.4.0",
+            # "software.amazon.awssdk:bundle:2.20.131",
+            # "software.amazon.awssdk:url-connection-client:2.20.131",
+        ]
         conf = (
             pyspark.SparkConf()
             .set(
                 "spark.jars.packages",
-                "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2,org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.91.3,software.amazon.awssdk:bundle:2.20.131,software.amazon.awssdk:url-connection-client:2.20.131",
+                ",".join(extra_packages),
             )
             # SQL Extensions
             .set(
