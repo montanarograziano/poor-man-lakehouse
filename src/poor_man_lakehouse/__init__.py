@@ -7,6 +7,3 @@ from poor_man_lakehouse.spark.builder import (
 from poor_man_lakehouse.spark.builder import (
     IcebergNessieSparkBuilder as IcebergNessieSparkBuilder,
 )
-from poor_man_lakehouse.spark.builder import retrieve_current_spark_session
-
-spark = retrieve_current_spark_session()

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Application Path
     APP_NAME: str = "Poor Man Lakehouse"
-    PROJECT_NAME: str = "poor-mane-lakehouse"
+    PROJECT_NAME: str = "poor-man-lakehouse"
     REPO_PATH: str = os.path.abspath(".")
     SETTINGS_PATH: str = os.path.join(REPO_PATH, "settings")
 
@@ -44,14 +44,15 @@ class Settings(BaseSettings):
     CATALOG_DEFAULT_SCHEMA: str = "default"
 
     # Nessie Configuration
-    NESSIE_SERVER_URI: str = "http://nessie:19120:/api/v2"
+    NESSIE_SPARK_SERVER_URI: str = "http://localhost:19120:/api/v1"
+    NESSIE_DREMIO_SERVER_URI: str = "http://localhost:19120:/api/v2"
 
     # Spark settings
     SPARK_MASTER: str = "local[*]"
 
     # AWS Path
     BUCKET_NAME: str = "test"
-    WAREHOUSE_BUCKET: str = "s3://warehouse/"
+    WAREHOUSE_BUCKET: str = "s3a://warehouse/"
 
     def _configure_data_path(self):
         """Configure S3 storage options."""

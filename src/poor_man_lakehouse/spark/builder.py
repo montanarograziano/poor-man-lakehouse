@@ -6,6 +6,8 @@ from pyspark.sql import SparkSession
 
 from poor_man_lakehouse.config import settings
 
+SCALA_VERSION = "2.12"
+
 
 class SparkBuilder(ABC):
     root_builder = SparkSession.builder.appName("Poor Man Lakehouse").master(
@@ -23,7 +25,7 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
 
     extra_packages = [
         "org.apache.hadoop:hadoop-aws:3.4.0",
-        "io.unitycatalog:unitycatalog-spark_2.13:0.3.0",
+        f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.0",
     ]
 
     def get_spark_session(self) -> SparkSession:
@@ -37,11 +39,11 @@ class IcebergNessieSparkBuilder(SparkBuilder):
 
     def get_spark_session(self) -> SparkSession:
         extra_packages = [
-            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.13:1.9.1",
-            "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.13:0.104.2",
+            f"org.apache.iceberg:iceberg-spark-runtime-3.5_{SCALA_VERSION}:1.9.1",
+            f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.104.2",
             "org.apache.hadoop:hadoop-aws:3.4.0",
-            # "software.amazon.awssdk:bundle:2.20.131",
-            # "software.amazon.awssdk:url-connection-client:2.20.131",
+            "software.amazon.awssdk:bundle:2.31.68",
+            "software.amazon.awssdk:url-connection-client:2.31.68",
         ]
         conf = (
             pyspark.SparkConf()
@@ -56,18 +58,21 @@ class IcebergNessieSparkBuilder(SparkBuilder):
             )
             # Configuring Catalog
             .set("spark.sql.catalog.nessie", "org.apache.iceberg.spark.SparkCatalog")
-            .set("spark.sql.catalog.nessie.uri", settings.NESSIE_SERVER_URI)
+            .set("spark.sql.catalog.nessie.uri", settings.NESSIE_SPARK_SERVER_URI)
             .set("spark.sql.catalog.nessie.ref", "main")
+            .set("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT)
             .set("spark.sql.catalog.nessie.authentication.type", "NONE")
             .set(
                 "spark.sql.catalog.nessie.catalog-impl",
                 "org.apache.iceberg.nessie.NessieCatalog",
             )
-            .set("spark.sql.catalog.nessie.s3.endpoint", settings.MINIO_ENDPOINT)
-            .set("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
             .set(
-                "spark.sql.catalog.nessie.io-impl", "org.apache.iceberg.aws.s3.S3FileIO"
+                "spark.sql.catalog.nessie.io-impl",
+                "org.apache.iceberg.aws.s3.S3FileIO",
             )
+            .set("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
+            .set("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
+            .set("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
         )
 
         return self.root_builder.config(conf=conf).getOrCreate()
