@@ -33,21 +33,25 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_ENDPOINT: str = "http://localhost:9000"
+    MINIO_ENDPOINT: str = "http://minio:9000"
     AWS_SESSION_TOKEN: str = ""  # not necessary locally
     S3_STORAGE_OPTIONS: dict = {}
 
     # Catalog settings
+    CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie"
     CATALOG_URI: str = "http://localhost:8080"
     CATALOG_NAME: str = "unity"
     CATALOG_DEFAULT_SCHEMA: str = "default"
 
+    # Nessie Configuration
+    NESSIE_SERVER_URI: str = "http://nessie:19120:/api/v2"
+
     # Spark settings
     SPARK_MASTER: str = "local[*]"
 
-    # DATA SETTINGS ##
     # AWS Path
     BUCKET_NAME: str = "test"
-    S3_ROOT_PATH: str = "s3://test/"
+    WAREHOUSE_BUCKET: str = "s3://warehouse/"
 
     def _configure_data_path(self):
         """Configure S3 storage options."""

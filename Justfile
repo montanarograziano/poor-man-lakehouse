@@ -9,6 +9,7 @@ install:
     {{just_executable()}} needs uv
     uv sync --all-groups
     uv run pre-commit install --install-hooks
+    uv pip install -e .
 
 # Update dependencies and pre-commit hooks
 update:
@@ -32,6 +33,13 @@ up:
 down:
   {{just_executable()}} needs docker
   docker compose down
+
+# Launch docker compose in clean environment
+up_clean:
+  {{just_executable()}} needs docker
+  docker compose down --remove-orphans --volumes
+  find ./configs -type d -name "data" -exec rm -rf {} +
+  docker compose up --build --detach
 
 
 # Commit with conventional commits

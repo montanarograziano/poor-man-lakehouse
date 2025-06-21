@@ -43,6 +43,44 @@ services:
       postgres_db:
         condition: service_healthy
 
+  nessie:
+    image: ghcr.io/projectnessie/nessie
+    container_name: nessie
+    ports:
+      - 19120:19120
+    # environment:
+    #   - nessie.version.store.type=IN_MEMORY
+    #   - nessie.catalog.default-warehouse=warehouse
+    #   - nessie.catalog.warehouses.warehouse.location=s3://test/
+    #   - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
+    #   - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+    #   - nessie.catalog.service.s3.default-options.path-style-access=true
+    #   - nessie.catalog.service.s3.default-options.auth-type=STATIC
+    #   - nessie.catalog.secrets.access-key.name=minioadmin
+    #   - nessie.catalog.secrets.access-key.secret=miniopassword
+    #   # - nessie.catalog.service.s3.default-options.region=us-east-1
+    #   - nessie.server.authentication.enabled=false
+    volumes:
+      - ./nessie-data:/nessie/data
+
+
+  dremio:
+    platform: linux/x86_64
+    image: dremio/dremio-oss:latest
+    ports:
+      - 9047:9047
+      - 31010:31010
+      - 32010:32010
+    container_name: dremio
+    environment:
+      # DREMIO_JAVA_SERVER_EXTRA_OPTS: Dpaths.dist=file:///opt/dremio/data/dist
+      DREMIO_ROOT_EMAIL: admin@example.com
+      DREMIO_ROOT_PASSWORD: password
+    volumes:
+      - ./configs/dremio/data:/opt/dremio/data
+      - ./configs/dremio/logs:/opt/dremio/logs
+      - ./configs/dremio/plugins:/opt/dremio/plugins
+
   spark-master:
     image: bitnami/spark:4.0.0
     command: bin/spark-class org.apache.spark.deploy.master.Master
