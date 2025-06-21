@@ -61,7 +61,7 @@ services:
     #   # - nessie.catalog.service.s3.default-options.region=us-east-1
     #   - nessie.server.authentication.enabled=false
     volumes:
-      - ./nessie-data:/nessie/data
+      - ./configs/nessie/data:/nessie/data
 
 
   dremio:

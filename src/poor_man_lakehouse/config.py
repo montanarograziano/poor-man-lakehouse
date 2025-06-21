@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     NESSIE_DREMIO_SERVER_URI: str = "http://localhost:19120:/api/v2"
 
     # Spark settings
-    SPARK_MASTER: str = "local[*]"
+    SPARK_MASTER: str = "spark://localhost:7077"
 
     # AWS Path
     BUCKET_NAME: str = "test"

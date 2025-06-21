@@ -6,7 +6,7 @@ from pyspark.sql import SparkSession
 
 from poor_man_lakehouse.config import settings
 
-SCALA_VERSION = "2.12"
+SCALA_VERSION = "2.13"
 
 
 class SparkBuilder(ABC):
