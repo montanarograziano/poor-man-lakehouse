@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     NESSIE_SPARK_SERVER_URI: str = "http://localhost:19120:/api/v1"
     NESSIE_DREMIO_SERVER_URI: str = "http://localhost:19120:/api/v2"
 
+    # LakeKeeper Configuration
+    LAKEKEEPER_SERVER_URI: str = "http://localhost:8181"
+
+    # Dremio settings
+    DREMIO_SERVER_URI: str = "http://dremio:9047"
+    ARROW_ENDPOINT: str = "grpc://localhost:32010"
+    DREMIO_USERNAME: str = "admin"
+    DREMIO_PASSWORD: str = "cambiami01"
+
     # Spark settings
     SPARK_MASTER: str = "spark://localhost:7077"
 
@@ -71,8 +80,6 @@ class Settings(BaseSettings):
         self.LOG_FILE_NAME: str = self.LOG_FILE_NAME
         self.LOG_FOLDER: str = self.LOG_FOLDER
         self.LOG_FILE_PATH: str = os.path.join(self.LOG_FOLDER, self.LOG_FILE_NAME)
-        # sink configuration
-        # logger.configure(handlers=[logfire.loguru_handler()])
         logger.add(
             sink=sys.stderr,
             colorize=True,
