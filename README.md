@@ -5,6 +5,8 @@
 
 - [ ] Interact correctly between Unity Catalog and Docker pyspark
 - [ ] Add missing healthchecks for containers
-- [ ] Provide interface to select desired Catalog (ad-hoc install of pyspark jars, configs etc.)
+- [X] Provide interface to select desired Catalog (ad-hoc install of pyspark jars, configs etc.)
 - [ ] Test Ibis for handling multiple backend engines
 - [ ] Add frontend Docker Image for Unity Catalog
+
+Currently, notebooks explains the experiments done so far with various engines and catalogs. Unity Catalog seems the most promising, but the current setting is still not complete.
