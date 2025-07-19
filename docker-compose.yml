@@ -43,88 +43,88 @@ services:
       postgres_db:
         condition: service_healthy
 
-  nessie:
-    image: ghcr.io/projectnessie/nessie
-    container_name: nessie
-    ports:
-      - 19120:19120
-    environment:
-      - nessie.catalog.default-warehouse=warehouse
-      - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
-      - nessie.catalog.service.s3.region=eu-central-1
-      - nessie.server.authentication.enabled=false
-      - nessie.catalog.service.s3.endpoint=http://minio:9000
-      - nessie.catalog.service.s3.path-style-access=true
-      - nessie.catalog.service.s3.access-key.name=minioadmin
-      - nessie.catalog.service.s3.access-key.secret=miniopassword
-    volumes:
-      - ./configs/nessie/data:/var/lib/nessie/data
+  # nessie:
+  #   image: ghcr.io/projectnessie/nessie
+  #   container_name: nessie
+  #   ports:
+  #     - 19120:19120
+  #   environment:
+  #     - nessie.catalog.default-warehouse=warehouse
+  #     - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
+  #     - nessie.catalog.service.s3.region=eu-central-1
+  #     - nessie.server.authentication.enabled=false
+  #     - nessie.catalog.service.s3.endpoint=http://minio:9000
+  #     - nessie.catalog.service.s3.path-style-access=true
+  #     - nessie.catalog.service.s3.access-key.name=minioadmin
+  #     - nessie.catalog.service.s3.access-key.secret=miniopassword
+  #   volumes:
+  #     - ./configs/nessie/data:/var/lib/nessie/data
 
 
-  dremio:
-    platform: linux/x86_64
-    image: dremio/dremio-oss:latest
-    ports:
-      - 9047:9047
-      - 31010:31010
-      - 32010:32010
-    container_name: dremio
-    environment:
-      # DREMIO_JAVA_SERVER_EXTRA_OPTS: Dpaths.dist=file:///opt/dremio/data/dist
-      DREMIO_ROOT_EMAIL: admin@example.com
-      DREMIO_ROOT_PASSWORD: password
-    volumes:
-      - ./configs/dremio/data:/opt/dremio/data
-      - ./configs/dremio/logs:/opt/dremio/logs
-      - ./configs/dremio/plugins:/opt/dremio/plugins
+  # dremio:
+  #   platform: linux/x86_64
+  #   image: dremio/dremio-oss:latest
+  #   ports:
+  #     - 9047:9047
+  #     - 31010:31010
+  #     - 32010:32010
+  #   container_name: dremio
+  #   environment:
+  #     # DREMIO_JAVA_SERVER_EXTRA_OPTS: Dpaths.dist=file:///opt/dremio/data/dist
+  #     DREMIO_ROOT_EMAIL: admin@example.com
+  #     DREMIO_ROOT_PASSWORD: password
+  #   volumes:
+  #     - ./configs/dremio/data:/opt/dremio/data
+  #     - ./configs/dremio/logs:/opt/dremio/logs
+  #     - ./configs/dremio/plugins:/opt/dremio/plugins
 
-  spark-master:
-    image: bitnami/spark:4.0.0
-    command: bin/spark-class org.apache.spark.deploy.master.Master
-    hostname: spark-master
-    ports:
-      - "8081:8080" # Spark Master UI
-      - "7077:7077" # Spark Master internal communication
-      - "10000:10000" # Spark Connect
-    environment:
-      SPARK_MASTER_HOST: spark-master
-      SPARK_MASTER_PORT: 7077
-      SPARK_DRIVER_PORT: 7001
-      SPARK_BLOCKMGR_PORT: 7002
-      SPARK_WORKER_PORT: 7003
-      # Minio credentials for Spark to access S3-compatible storage
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: miniopassword
-      AWS_ENDPOINT: http://minio:9000
-      # Spark configs for Minio (S3A) and Unity Catalog
-      SPARK_CONF_DIR: /opt/spark/conf
-    volumes:
-      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
-    # depends_on:
-    #   minio:
-    #     condition: service_healthy
-    # healthcheck:
-    #   # Check if the Spark Master UI is reachable
-    #   test: ["CMD", "curl", "-f", "http://localhost:8081"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 20s # Give Spark Master time to start its UI
+  # spark-master:
+  #   image: bitnami/spark:4.0.0
+  #   command: bin/spark-class org.apache.spark.deploy.master.Master
+  #   hostname: spark-master
+  #   ports:
+  #     - "8081:8080" # Spark Master UI
+  #     - "7077:7077" # Spark Master internal communication
+  #     - "10000:10000" # Spark Connect
+  #   environment:
+  #     SPARK_MASTER_HOST: spark-master
+  #     SPARK_MASTER_PORT: 7077
+  #     SPARK_DRIVER_PORT: 7001
+  #     SPARK_BLOCKMGR_PORT: 7002
+  #     SPARK_WORKER_PORT: 7003
+  #     # Minio credentials for Spark to access S3-compatible storage
+  #     AWS_ACCESS_KEY_ID: minioadmin
+  #     AWS_SECRET_ACCESS_KEY: miniopassword
+  #     AWS_ENDPOINT: http://minio:9000
+  #     # Spark configs for Minio (S3A) and Unity Catalog
+  #     SPARK_CONF_DIR: /opt/spark/conf
+  #   volumes:
+  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
+  #   # depends_on:
+  #   #   minio:
+  #   #     condition: service_healthy
+  #   # healthcheck:
+  #   #   # Check if the Spark Master UI is reachable
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8081"]
+  #   #   interval: 10s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 20s # Give Spark Master time to start its UI
 
-  spark-worker:
-    image: bitnami/spark:4.0.0
-    hostname: spark-worker
-    command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-    environment:
-      SPARK_MASTER_HOST: spark-master
-      SPARK_MASTER_PORT: 7077
-      # Minio credentials for Spark worker
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: miniopassword
-      AWS_ENDPOINT: http://minio:9000
-      SPARK_CONF_DIR: /opt/spark/conf
-    volumes:
-      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
-    # depends_on:
-    #   spark-master:
-    #     condition: service_healthy
+  # spark-worker:
+  #   image: bitnami/spark:4.0.0
+  #   hostname: spark-worker
+  #   command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  #   environment:
+  #     SPARK_MASTER_HOST: spark-master
+  #     SPARK_MASTER_PORT: 7077
+  #     # Minio credentials for Spark worker
+  #     AWS_ACCESS_KEY_ID: minioadmin
+  #     AWS_SECRET_ACCESS_KEY: miniopassword
+  #     AWS_ENDPOINT: http://minio:9000
+  #     SPARK_CONF_DIR: /opt/spark/conf
+  #   volumes:
+  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
+  #   # depends_on:
+  #   #   spark-master:
+  #   #     condition: service_healthy
