@@ -17,7 +17,7 @@ services:
       retries: 3
 
   postgres_db:
-    image: postgres:16
+    image: postgres:17
     ports:
       - "5432:5432"
     environment:
@@ -43,22 +43,27 @@ services:
       postgres_db:
         condition: service_healthy
 
-  # nessie:
-  #   image: ghcr.io/projectnessie/nessie
-  #   container_name: nessie
-  #   ports:
-  #     - 19120:19120
-  #   environment:
-  #     - nessie.catalog.default-warehouse=warehouse
-  #     - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
-  #     - nessie.catalog.service.s3.region=eu-central-1
-  #     - nessie.server.authentication.enabled=false
-  #     - nessie.catalog.service.s3.endpoint=http://minio:9000
-  #     - nessie.catalog.service.s3.path-style-access=true
-  #     - nessie.catalog.service.s3.access-key.name=minioadmin
-  #     - nessie.catalog.service.s3.access-key.secret=miniopassword
-  #   volumes:
-  #     - ./configs/nessie/data:/var/lib/nessie/data
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    container_name: nessie
+    ports:
+      - 19120:19120
+    environment:
+    # Name of the default warehouse
+      - nessie.catalog.default-warehouse=warehouse
+    # The base location of the warehouse named "warehouse"
+      - nessie.catalog.warehouses.warehouse.location=s3://warehouse
+
+    # Default/global S3 configuration settings
+      - nessie.catalog.service.s3.default-options.region=eu-central-1
+      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
+      - my-secrets-default.name=minioadmin
+      - my-secrets-default.secret=miniopassword
+    # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
+      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+    volumes:
+      - ./configs/nessie/data:/var/lib/nessie/data
 
 
   # dremio:
