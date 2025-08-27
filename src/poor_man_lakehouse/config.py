@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     MINIO_ENDPOINT: str = "http://minio:9000"
     AWS_SESSION_TOKEN: str = ""  # not necessary locally
     S3_STORAGE_OPTIONS: dict = {}
+    ICEBERG_STORAGE_OPTIONS: dict = {}
 
     # Catalog settings
     CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie"
@@ -46,6 +47,7 @@ class Settings(BaseSettings):
     # Nessie Configuration
     NESSIE_SPARK_SERVER_URI: str = "http://localhost:19120:/api/v1"
     NESSIE_DREMIO_SERVER_URI: str = "http://localhost:19120:/api/v2"
+    NESSIE_PYICEBERG_SERVER_URI: str = "http://nessie:19120/iceberg"
 
     # LakeKeeper Configuration
     LAKEKEEPER_SERVER_URI: str = "http://localhost:8181"
@@ -73,6 +75,14 @@ class Settings(BaseSettings):
             "AWS_REGION": self.AWS_DEFAULT_REGION,
             "AWS_DEFAULT_REGION": self.AWS_DEFAULT_REGION,
             "AWS_ENDPOINT": self.AWS_ENDPOINT,
+        }
+
+        self.ICEBERG_STORAGE_OPTIONS = {
+            "s3.endpoint": self.AWS_ENDPOINT,
+            "s3.access.key": self.AWS_ACCESS_KEY_ID,
+            "s3.secret.key": self.AWS_SECRET_ACCESS_KEY,
+            "s3.region": self.AWS_DEFAULT_REGION,
+            "warehouse": self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
         }
 
     def _setup_logger(self):
