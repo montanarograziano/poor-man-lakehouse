@@ -50,19 +50,19 @@ class Settings(BaseSettings):
     NESSIE_PYICEBERG_SERVER_URI: str = "http://nessie:19120/iceberg"
 
     # LakeKeeper Configuration
-    LAKEKEEPER_SERVER_URI: str = "http://localhost:8181"
+    LAKEKEEPER_SERVER_URI: str = "http://lakekeeper:8181"
 
     # Dremio settings
     DREMIO_SERVER_URI: str = "http://dremio:9047"
-    ARROW_ENDPOINT: str = "grpc://localhost:32010"
+    ARROW_ENDPOINT: str = "grpc://dremio:32010"
     DREMIO_USERNAME: str = "admin"
-    DREMIO_PASSWORD: str = "cambiami01"
+    DREMIO_PASSWORD: str = "password"
 
     # Spark settings
-    SPARK_MASTER: str = "spark://localhost:7077"
+    SPARK_MASTER: str = "spark://spark-master:7077"
 
     # AWS Path
-    BUCKET_NAME: str = "test"
+    BUCKET_NAME: str = "warehouse"
     WAREHOUSE_BUCKET: str = "s3://warehouse/"
 
     def _configure_data_path(self):
