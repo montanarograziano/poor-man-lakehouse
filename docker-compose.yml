@@ -21,13 +21,13 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: unity_catalog_db
-      POSTGRES_USER: uc_user
-      POSTGRES_PASSWORD: uc_password
+      POSTGRES_DB: catalog_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
     volumes:
       - ./configs/postgres/data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U uc_user -d unity_catalog_db"]
+      test: ["CMD-SHELL", "pg_isready -U user -d catalog_db"]
       interval: 10s
       timeout: 5s
       retries: 5
