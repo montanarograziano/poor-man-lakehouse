@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     # Catalog settings
     CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie"
     CATALOG_URI: str = "http://localhost:8080"
-    CATALOG_NAME: str = "unity"
+    CATALOG_NAME: str = "nessie"
     CATALOG_DEFAULT_SCHEMA: str = "default"
 
     # Nessie Configuration
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
 
     # AWS Path
     BUCKET_NAME: str = "test"
-    WAREHOUSE_BUCKET: str = "s3a://warehouse/"
+    WAREHOUSE_BUCKET: str = "s3://warehouse/"
 
     def _configure_data_path(self):
         """Configure S3 storage options."""

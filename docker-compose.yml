@@ -66,22 +66,22 @@ services:
       - ./configs/nessie/data:/var/lib/nessie/data
 
 
-  # dremio:
-  #   platform: linux/x86_64
-  #   image: dremio/dremio-oss:latest
-  #   ports:
-  #     - 9047:9047
-  #     - 31010:31010
-  #     - 32010:32010
-  #   container_name: dremio
-  #   environment:
-  #     # DREMIO_JAVA_SERVER_EXTRA_OPTS: Dpaths.dist=file:///opt/dremio/data/dist
-  #     DREMIO_ROOT_EMAIL: admin@example.com
-  #     DREMIO_ROOT_PASSWORD: password
-  #   volumes:
-  #     - ./configs/dremio/data:/opt/dremio/data
-  #     - ./configs/dremio/logs:/opt/dremio/logs
-  #     - ./configs/dremio/plugins:/opt/dremio/plugins
+  dremio:
+    platform: linux/x86_64
+    image: dremio/dremio-oss:latest
+    ports:
+      - 9047:9047
+      - 31010:31010
+      - 32010:32010
+    container_name: dremio
+    environment:
+      # DREMIO_JAVA_SERVER_EXTRA_OPTS: Dpaths.dist=file:///opt/dremio/data/dist
+      DREMIO_ROOT_EMAIL: admin@example.com
+      DREMIO_ROOT_PASSWORD: password
+    volumes:
+      - ./configs/dremio/data:/opt/dremio/data
+      - ./configs/dremio/logs:/opt/dremio/logs
+      - ./configs/dremio/plugins:/opt/dremio/plugins
 
   # spark-master:
   #   image: bitnami/spark:4.0.0
