@@ -11,8 +11,10 @@ SCALA_VERSION = "2.13"
 
 
 class SparkBuilder(ABC):
-    root_builder = SparkSession.builder.appName("Poor Man Lakehouse").master(
-        settings.SPARK_MASTER
+    root_builder = (
+        SparkSession.Builder()
+        .appName("Poor Man Lakehouse")
+        .master(settings.SPARK_MASTER)
     )
 
     @abstractmethod
@@ -40,43 +42,43 @@ class IcebergNessieSparkBuilder(SparkBuilder):
 
     def get_spark_session(self) -> SparkSession:
         extra_packages = [
-            f"org.apache.iceberg:iceberg-spark-runtime-3.5_{SCALA_VERSION}:1.9.1",
-            f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.104.2",
-            "org.apache.hadoop:hadoop-aws:3.4.0",
-            "software.amazon.awssdk:bundle:2.31.68",
-            "software.amazon.awssdk:url-connection-client:2.31.68",
+            f"org.apache.iceberg:iceberg-spark-runtime-3.5_{SCALA_VERSION}:1.9.2",
+            f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.103.3",
+            "org.apache.iceberg:iceberg-aws-bundle:1.9.2",
         ]
-        conf = (
-            pyspark.SparkConf()
-            .set(
-                "spark.jars.packages",
-                ",".join(extra_packages),
-            )
-            # SQL Extensions
-            .set(
+        extra_jars = ",".join(extra_packages)
+
+        return (
+            self.root_builder.config("spark.jars.packages", extra_jars)
+            .config(
                 "spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",
             )
-            # Configuring Catalog
-            .set("spark.sql.catalog.nessie", "org.apache.iceberg.spark.SparkCatalog")
-            .set("spark.sql.catalog.nessie.uri", settings.NESSIE_SPARK_SERVER_URI)
-            .set("spark.sql.catalog.nessie.ref", "main")
-            .set("spark.sql.catalog.nessie.authentication.type", "NONE")
-            .set(
-                "spark.sql.catalog.nessie.catalog-impl",
-                "org.apache.iceberg.nessie.NessieCatalog",
+            .config("spark.sql.catalog.nessie", "org.apache.iceberg.spark.SparkCatalog")
+            .config(
+                "spark.sql.catalog.nessie.uri", settings.NESSIE_PYICEBERG_SERVER_URI
             )
-            .set("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT)
-            .set("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
-            .set(
+            .config("spark.sql.catalog.nessie.type", "rest")
+            .config("spark.sql.catalog.nessie.ref", "main")
+            .config("spark.sql.catalog.nessie.authentication.type", "NONE")
+            .config("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
+            .config("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT)
+            .config(
                 "spark.sql.catalog.nessie.io-impl",
                 "org.apache.iceberg.aws.s3.S3FileIO",
             )
-            .set("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
-            .set("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
+            .config("spark.sql.defaultCatalog", "nessie")
+            .config("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
+            .config("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
+            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
+            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT)
+            .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config("spark.hadoop.fs.s3a.attempts.maximum", "1")
+            .config("spark.hadoop.fs.s3a.connection.establish.timeout", "1000")
+            .config("spark.hadoop.fs.s3a.connection.timeout", "10000")
+            .getOrCreate()
         )
-
-        return self.root_builder.config(conf=conf).getOrCreate()
 
 
 class IcebergLakeKeeperSparkBuilder(SparkBuilder):
@@ -133,6 +135,7 @@ class IcebergLakeKeeperSparkBuilder(SparkBuilder):
             )
             .set("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
             .set("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
+            .set("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT)
         )
 
         return self.root_builder.config(conf=conf).getOrCreate()
