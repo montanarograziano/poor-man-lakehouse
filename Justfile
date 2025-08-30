@@ -41,6 +41,11 @@ up_clean:
   find ./configs -type d -name "data" -exec rm -rf {} +
   docker compose up --build --detach
 
+# Read logs from Compose
+logs:
+  {{just_executable()}} needs docker
+  docker compose logs --follow
+
 
 # Commit with conventional commits
 @commit:
