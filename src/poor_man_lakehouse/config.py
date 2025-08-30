@@ -55,8 +55,9 @@ class Settings(BaseSettings):
     # Dremio settings
     DREMIO_SERVER_URI: str = "http://dremio:9047"
     ARROW_ENDPOINT: str = "grpc://dremio:32010"
-    DREMIO_USERNAME: str = "admin"
-    DREMIO_PASSWORD: str = "password"
+    DREMIO_USERNAME: str = "dremio"
+    DREMIO_ROOT_PASSWORD: str = "dremio123"
+    DREMIO_ROOT_EMAIL: str = "admin@example.com"
 
     # Spark settings
     SPARK_MASTER: str = "spark://spark-master:7077"
