@@ -4,9 +4,10 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001" # Minio Console port
+    restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: miniopassword
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
     volumes:
       - ./configs/minio/data:/data
     command: server /data --console-address ":9001"
@@ -16,18 +17,35 @@ services:
       timeout: 20s
       retries: 3
 
+  minio-init-bucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set minio ${AWS_ENDPOINT} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
+      /usr/bin/mc ls minio/warehouse || /usr/bin/mc mb minio/warehouse
+      "
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://minio:9000}
+
   postgres_db:
     image: postgres:17
     ports:
       - "5432:5432"
+
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: catalog_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB:-catalog_db}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     volumes:
       - ./configs/postgres/data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d catalog_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-catalog_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,21 +64,33 @@ services:
   nessie:
     image: ghcr.io/projectnessie/nessie:latest
     container_name: nessie
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres_db:
+        condition: service_healthy
+    restart: unless-stopped
     ports:
       - 19120:19120
+
+    healthcheck:
+      test: "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /q/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"
+      interval: 5s
+      timeout: 2s
+      retries: 15
     environment:
     # Name of the default warehouse
       - nessie.catalog.default-warehouse=warehouse
     # The base location of the warehouse named "warehouse"
-      - nessie.catalog.warehouses.warehouse.location=s3://warehouse
-
+      - nessie.catalog.warehouses.warehouse.location=${WAREHOUSE_BUCKET:-s3://warehouse}
     # Default/global S3 configuration settings
-      - nessie.catalog.service.s3.default-options.region=eu-central-1
+      - nessie.catalog.service.s3.default-options.region=${AWS_DEFAULT_REGION:-eu-central-1}
       - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
-      - my-secrets-default.name=minioadmin
-      - my-secrets-default.secret=miniopassword
+      - my-secrets-default.name=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
     # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
-      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000
+      - nessie.catalog.service.s3.default-options.endpoint=${AWS_ENDPOINT:-http://minio:9000}
+      - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
       - nessie.catalog.service.s3.default-options.path-style-access=true
     volumes:
       - ./configs/nessie/data:/var/lib/nessie/data
@@ -74,14 +104,51 @@ services:
       - 31010:31010
       - 32010:32010
     container_name: dremio
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9047"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    env_file:  .env
     environment:
-      # DREMIO_JAVA_SERVER_EXTRA_OPTS: Dpaths.dist=file:///opt/dremio/data/dist
-      DREMIO_ROOT_EMAIL: admin@example.com
-      DREMIO_ROOT_PASSWORD: password
+      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+      DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
     volumes:
       - ./configs/dremio/data:/opt/dremio/data
+      - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
       - ./configs/dremio/logs:/opt/dremio/logs
+      - ./configs/dremio/local:/localFiles
       - ./configs/dremio/plugins:/opt/dremio/plugins
+
+  dremio-init-catalog:
+    image: alpine/curl:latest
+    container_name: dremio-init-catalog
+    depends_on:
+      dremio:
+        condition: service_healthy
+      nessie:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file:  .env
+    environment:
+      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+      DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://minio:9000}
+      NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
+    volumes:
+      - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
+    entrypoint: /usr/local/bin/init_dremio.sh
+
 
   # spark-master:
   #   image: bitnami/spark:4.0.0
@@ -98,8 +165,8 @@ services:
   #     SPARK_BLOCKMGR_PORT: 7002
   #     SPARK_WORKER_PORT: 7003
   #     # Minio credentials for Spark to access S3-compatible storage
-  #     AWS_ACCESS_KEY_ID: minioadmin
-  #     AWS_SECRET_ACCESS_KEY: miniopassword
+  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniopassword}
   #     AWS_ENDPOINT: http://minio:9000
   #     # Spark configs for Minio (S3A) and Unity Catalog
   #     SPARK_CONF_DIR: /opt/spark/conf
@@ -124,8 +191,8 @@ services:
   #     SPARK_MASTER_HOST: spark-master
   #     SPARK_MASTER_PORT: 7077
   #     # Minio credentials for Spark worker
-  #     AWS_ACCESS_KEY_ID: minioadmin
-  #     AWS_SECRET_ACCESS_KEY: miniopassword
+  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniopassword}
   #     AWS_ENDPOINT: http://minio:9000
   #     SPARK_CONF_DIR: /opt/spark/conf
   #   volumes:
