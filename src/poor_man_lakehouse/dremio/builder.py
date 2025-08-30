@@ -214,7 +214,9 @@ class DremioConnection:
         """Check if Nessie catalog already exists."""
         try:
             headers = {"Authorization": f"Bearer {token}"}
-            response = requests.get(f"{self.source_endpoint}/nessie", headers=headers)
+            response = requests.get(
+                f"{self.source_endpoint}/by-path/nessie", headers=headers
+            )
 
             if response.status_code == 200:
                 data: dict = response.json()

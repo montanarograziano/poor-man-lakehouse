@@ -59,7 +59,7 @@ fi
 echo "Successfully authenticated. Token length: ${#TOKEN}"
 
 # Check if Nessie catalog already exists
-curl -s -X GET -H "Authorization: Bearer ${TOKEN}" http://dremio:9047/api/v3/catalog/nessie | grep -q '"name":"nessie"'
+curl -s -X GET -H "Authorization: Bearer ${TOKEN}" http://dremio:9047/api/v3/catalog/by-path/nessie | grep -q '"name":"nessie"'
 if [ $? -eq 0 ]; then
     echo "Nessie catalog 'nessie' already exists. Skipping creation."
 else
