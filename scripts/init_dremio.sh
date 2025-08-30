@@ -6,8 +6,8 @@ if [ -f .env ]; then
 fi
 
 # Set default values if not provided
-DREMIO_USERNAME=${DREMIO_USERNAME:-"dremio"}
-DREMIO_ROOT_PASSWORD=${DREMIO_ROOT_PASSWORD:-"dremio123"}
+DREMIO_USERNAME=dremio
+DREMIO_ROOT_PASSWORD=dremio123
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-"minioadmin"}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-"miniopassword"}
 AWS_ENDPOINT=${AWS_ENDPOINT:-"http://minio:9000"}
