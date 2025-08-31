@@ -90,7 +90,7 @@ services:
       - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
     # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
       - nessie.catalog.service.s3.default-options.endpoint=${AWS_ENDPOINT:-http://minio:9000}
-      - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
+      # - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
       - nessie.catalog.service.s3.default-options.path-style-access=true
     volumes:
       - ./configs/nessie/data:/var/lib/nessie/data
