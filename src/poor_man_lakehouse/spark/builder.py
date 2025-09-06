@@ -48,7 +48,7 @@ class IcebergNessieSparkBuilder(SparkBuilder):
         ]
         extra_jars = ",".join(extra_packages)
 
-        return (
+        spark = (
             self.root_builder.config("spark.jars.packages", extra_jars)
             .config(
                 "spark.sql.extensions",
@@ -77,8 +77,15 @@ class IcebergNessieSparkBuilder(SparkBuilder):
             .config("spark.hadoop.fs.s3a.attempts.maximum", "1")
             .config("spark.hadoop.fs.s3a.connection.establish.timeout", "1000")
             .config("spark.hadoop.fs.s3a.connection.timeout", "10000")
+            .config(
+                "spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"
+            )
+            .config("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
             .getOrCreate()
         )
+
+        spark.catalog.setCurrentDatabase("default")
+        return spark
 
 
 class IcebergLakeKeeperSparkBuilder(SparkBuilder):
@@ -137,8 +144,9 @@ class IcebergLakeKeeperSparkBuilder(SparkBuilder):
             .set("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
             .set("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT)
         )
-
-        return self.root_builder.config(conf=conf).getOrCreate()
+        spark = self.root_builder.config(conf=conf).getOrCreate()
+        spark.catalog.setCurrentDatabase("default")
+        return spark
 
 
 def retrieve_current_spark_session() -> SparkSession:

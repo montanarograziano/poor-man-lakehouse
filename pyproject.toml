@@ -66,3 +66,7 @@ exclude = ["scripts", "docs", "test", "pyarrow"]
 [[tool.mypy.overrides]]
 module = "pyarrow.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ibis.*"
+ignore_missing_imports = true
