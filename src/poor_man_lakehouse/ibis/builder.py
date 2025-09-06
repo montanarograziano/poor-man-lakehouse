@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 
 import ibis
@@ -47,7 +48,7 @@ class IbisConnection:
         if engine == "pyspark":
             con.catalog.setCurrentDatabase(database)
 
-    def sql(self, query: str, engine: sql_engines):
+    def sql(self, query: str, engine: engines):
         """
         Execute SQL queries using the specified engine.
 
@@ -58,9 +59,9 @@ class IbisConnection:
         Returns:
             Ibis table expression with query results
         """
-        if engine not in ["pyspark", "duckdb"]:
+        if engine not in ["pyspark", "duckdb", "polars"]:
             raise ValueError(
-                f"SQL interface only supports 'pyspark' and 'duckdb' engines, got: {engine}"
+                f"SQL interface only supports 'pyspark', 'duckdb' and 'polars' engines, got: {engine}"
             )
         if engine == "duckdb":
             self.set_current_database("default", engine)
@@ -75,6 +76,8 @@ class IbisConnection:
                 if "from memory." not in query
                 else query
             )
+        elif engine == "polars":
+            query = self._fix_polars_table_name(query)
 
         con = self.get_connection(engine)
         return con.sql(query)
@@ -139,6 +142,24 @@ class IbisConnection:
             raise NotImplementedError(
                 "DuckDB read_table is not implemented yet. Use sql() method instead."
             )
+
+    def _fix_polars_table_name(self, query: str) -> str:
+        """Wrap table name in single quotes.
+
+        Args:
+            query: The SQL query string.
+        """
+
+        pattern = r"FROM\s+([a-zA-Z_][a-zA-Z0-9_.]*)"
+        matches = re.findall(pattern, query, re.IGNORECASE)
+        for match in matches:
+            if not (match.startswith("'") and match.endswith("'")):
+                if match not in self.connections["polars"].list_tables():
+                    raise ValueError(
+                        f"Table '{match}' not found in Polars connection. Available tables: {self.connections['polars'].list_tables()}"
+                    )
+                query = query.replace(match, "'" + match + "'")
+        return query
 
 
 conn = IbisConnection()
