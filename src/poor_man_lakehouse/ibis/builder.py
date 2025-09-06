@@ -73,7 +73,7 @@ class IbisConnection:
                     f"{database}.{table_name}"
                 )
                 lazyframe = pl.scan_iceberg(iceberg_table, reader_override="pyiceberg")
-                con.create_table(f"{database}.{table_name}", lazyframe)
+                con.create_table(f"{database}.{table_name}", lazyframe, overwrite=True)
                 return con.table(f"{database}.{table_name}")
 
             except Exception as e:
