@@ -83,7 +83,10 @@ class IcebergNessieSparkBuilder(SparkBuilder):
             .config("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
             .getOrCreate()
         )
+        spark.catalog.setCurrentCatalog("nessie")
 
+        if not spark.catalog.databaseExists("nessie.default"):
+            spark.sql("CREATE DATABASE nessie.default")
         spark.catalog.setCurrentDatabase("default")
         return spark
 
@@ -145,6 +148,8 @@ class IcebergLakeKeeperSparkBuilder(SparkBuilder):
             .set("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT)
         )
         spark = self.root_builder.config(conf=conf).getOrCreate()
+        if not spark.catalog.databaseExists("default"):
+            spark.sql("CREATE DATABASE default")
         spark.catalog.setCurrentDatabase("default")
         return spark
 
