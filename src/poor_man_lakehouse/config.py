@@ -76,6 +76,8 @@ class Settings(BaseSettings):
             "AWS_REGION": self.AWS_DEFAULT_REGION,
             "AWS_DEFAULT_REGION": self.AWS_DEFAULT_REGION,
             "AWS_ENDPOINT": self.AWS_ENDPOINT,
+            "AWS_ALLOW_HTTP": "true",
+            "aws_conditional_put": "etag",
         }
 
         self.ICEBERG_STORAGE_OPTIONS = {
@@ -86,7 +88,7 @@ class Settings(BaseSettings):
             "warehouse": self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
         }
 
-    def _setup_logger(self):
+    def _setup_logger(self) -> None:
         logger.remove()  # to remove previous handlers and reset
         self.LOG_FILE_NAME: str = self.LOG_FILE_NAME
         self.LOG_FOLDER: str = self.LOG_FOLDER
