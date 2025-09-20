@@ -1,4 +1,3 @@
-import re
 from typing import Literal
 
 import ibis
@@ -77,7 +76,9 @@ class IbisConnection:
                 else query
             )
         elif engine == "polars":
-            query = self._fix_polars_table_name(query)
+            raise NotImplementedError(
+                "Polars sql() method is not implemented yet. Use read_table() method instead."
+            )
 
         con = self.get_connection(engine)
         return con.sql(query)
@@ -142,24 +143,6 @@ class IbisConnection:
             raise NotImplementedError(
                 "DuckDB read_table is not implemented yet. Use sql() method instead."
             )
-
-    def _fix_polars_table_name(self, query: str) -> str:
-        """Wrap table name in single quotes.
-
-        Args:
-            query: The SQL query string.
-        """
-
-        pattern = r"FROM\s+([a-zA-Z_][a-zA-Z0-9_.]*)"
-        matches = re.findall(pattern, query, re.IGNORECASE)
-        for match in matches:
-            if not (match.startswith("'") and match.endswith("'")):
-                if match not in self.connections["polars"].list_tables():
-                    raise ValueError(
-                        f"Table '{match}' not found in Polars connection. Available tables: {self.connections['polars'].list_tables()}"
-                    )
-                query = query.replace(match, "'" + match + "'")
-        return query
 
 
 conn = IbisConnection()
