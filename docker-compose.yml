@@ -50,16 +50,16 @@ services:
       timeout: 5s
       retries: 5
 
-  unity_catalog_server:
-    image: unitycatalog/unitycatalog:latest
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf # Custom Unity Catalog config
-      - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data # Custom Unity Catalog data
-    depends_on:
-      postgres_db:
-        condition: service_healthy
+  # unity_catalog_server:
+  #   image: unitycatalog/unitycatalog:latest
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf # Custom Unity Catalog config
+  #     - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data # Custom Unity Catalog data
+  #   depends_on:
+  #     postgres_db:
+  #       condition: service_healthy
 
   nessie:
     image: ghcr.io/projectnessie/nessie:latest
@@ -83,6 +83,13 @@ services:
       - nessie.catalog.default-warehouse=warehouse
     # The base location of the warehouse named "warehouse"
       - nessie.catalog.warehouses.warehouse.location=${WAREHOUSE_BUCKET:-s3://warehouse}
+    # JDBC URL for Postgres
+      - nessie.version.store.type=JDBC2
+      - nessie.version.store.persist.jdbc.datasource=postgresql
+      - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://postgres_db:5432/${POSTGRES_DB:-catalog_db}
+      - quarkus.datasource.postgresql.username=${POSTGRES_USER:-user}
+      - quarkus.datasource.postgresql.password=${POSTGRES_PASSWORD:-password}
+    # S3 as object storage
     # Default/global S3 configuration settings
       - nessie.catalog.service.s3.default-options.region=${AWS_DEFAULT_REGION:-eu-central-1}
       - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
