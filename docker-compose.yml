@@ -50,16 +50,18 @@ services:
       timeout: 5s
       retries: 5
 
-  # unity_catalog_server:
-  #   image: unitycatalog/unitycatalog:latest
-  #   ports:
-  #     - "8080:8080"
-  #   volumes:
-  #     - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf # Custom Unity Catalog config
-  #     - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data # Custom Unity Catalog data
-  #   depends_on:
-  #     postgres_db:
-  #       condition: service_healthy
+  unity_catalog_server:
+    image: unitycatalog/unitycatalog:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf # Custom Unity Catalog config
+      - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data # Custom Unity Catalog data
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   nessie:
     image: ghcr.io/projectnessie/nessie:latest
