@@ -157,6 +157,92 @@ services:
       - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
     entrypoint: /usr/local/bin/init_dremio.sh
 
+  lakekeeper:
+    image: &lakekeeper-image ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
+    pull_policy: &lakekeeper-pull-policy always
+    environment:
+      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+    command: [ "serve" ]
+    healthcheck:
+      test: [ "CMD", "/home/nonroot/lakekeeper", "healthcheck" ]
+      interval: 1s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      postgres_db:
+        condition: service_healthy
+      minio-init-bucket:
+        condition: service_completed_successfully
+    ports:
+      - "8181:8181"
+
+  migrate:
+    image: *lakekeeper-image
+    pull_policy: *lakekeeper-pull-policy
+    environment:
+      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+    restart: "no"
+    command: [ "migrate" ]
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  bootstrap:
+    image: curlimages/curl
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - -w
+      - "%{http_code}"
+      - "-X"
+      - "POST"
+      - "-v"
+      - "http://lakekeeper:8181/management/v1/bootstrap"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - '{"accept-terms-of-use": true}'
+      - "-o"
+      - "/dev/null"
+      # - "--fail-with-body"
+
+  initialwarehouse:
+    image: curlimages/curl
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+      minio-init-bucket:
+        condition: service_completed_successfully
+    restart: "no"
+    command:
+      - -w
+      - "%{http_code}"
+      - "-X"
+      - "POST"
+      - "-v"
+      - "http://lakekeeper:8181/management/v1/warehouse"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - "@create-default-warehouse.json"
+      - "-o"
+      - "/dev/null"
+      # - "--fail-with-body"
+    volumes:
+      - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
 
   # spark-master:
   #   image: bitnami/spark:4.0.0
