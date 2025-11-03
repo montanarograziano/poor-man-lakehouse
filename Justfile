@@ -8,17 +8,17 @@ set positional-arguments
 install:
     {{just_executable()}} needs uv
     uv sync --all-groups
-    uv run pre-commit install --install-hooks
+    uv run prek install
     uv pip install -e .
 
 # Update dependencies and pre-commit hooks
 update:
     uv sync --all-groups --update-packages
-    uv run pre-commit autoupdate
+    uv run prek auto-update
 
 # Run pre-commit hooks
 lint:
-    uv run pre-commit run
+    uv run prek run
 
 # Run all tests
 test:
