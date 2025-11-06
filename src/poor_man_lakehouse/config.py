@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     S3_STORAGE_OPTIONS: dict = {}
     ICEBERG_STORAGE_OPTIONS: dict = {}
 
+    # Postgres credentials
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_DB: str = "lakehouse_db"
+
     # Catalog settings
     CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie"
     CATALOG_URI: str = "http://localhost:8080"
