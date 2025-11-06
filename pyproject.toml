@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.9.1",
     "duckdb>=1.3.0",
     "setuptools>=80.9.0",
+    "marimo>=0.17.7",
 ]
 
 [project.urls]
