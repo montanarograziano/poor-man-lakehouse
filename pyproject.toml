@@ -14,7 +14,7 @@ dependencies = [
     "delta-spark<4.0.0",
     "ibis-framework[duckdb,polars,pyspark]>=10.5.0",
     "minio>=7.2.15",
-    "pyiceberg[s3fs,sql-sqlite]>=0.9.1",
+    "pyiceberg[s3fs,sql-postgres,sql-sqlite]>=0.9.1",
     "polars>=1.32.0",
     "deltalake>=1.0.2",
     "loguru>=0.7.3",
