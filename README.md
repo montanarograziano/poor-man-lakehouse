@@ -16,9 +16,9 @@ Run `just up` to spin Docker Compose services. Once everything is up run the fol
 
 - [ ] Interact correctly between Unity Catalog and Docker pyspark
 - [X] Setup Nessie for PyIceberg, Dremio and Pyspark
-- [ ] Add missing healthchecks for containers
+- [X] Add missing healthchecks for containers
 - [X] Provide interface to select desired Catalog (ad-hoc install of pyspark jars, configs etc.)
-- [ ] Test Ibis for handling multiple backend engines
+- [X] Test Ibis for handling multiple backend engines
 - [ ] Add frontend Docker Image for Unity Catalog
 
 Currently, notebooks explains the experiments done so far with various engines and catalogs. Unity Catalog seems the most promising, but the current setting is still not complete.
