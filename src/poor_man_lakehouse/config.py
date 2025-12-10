@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     AWS_DEFAULT_REGION: str = "eu-central-1"
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_ENDPOINT: str = "http://localhost:9000"
+    AWS_ENDPOINT_URL: str = "http://localhost:9000"
     MINIO_ENDPOINT: str = "http://minio:9000"
     AWS_SESSION_TOKEN: str = ""  # not necessary locally
     S3_STORAGE_OPTIONS: dict = {}
@@ -81,13 +81,13 @@ class Settings(BaseSettings):
             "AWS_SESSION_TOKEN": self.AWS_SESSION_TOKEN,
             "AWS_REGION": self.AWS_DEFAULT_REGION,
             "AWS_DEFAULT_REGION": self.AWS_DEFAULT_REGION,
-            "AWS_ENDPOINT": self.AWS_ENDPOINT,
+            "AWS_ENDPOINT_URL": self.AWS_ENDPOINT_URL,
             "AWS_ALLOW_HTTP": "true",
             "aws_conditional_put": "etag",
         }
 
         self.ICEBERG_STORAGE_OPTIONS = {
-            "s3.endpoint": self.AWS_ENDPOINT,
+            "s3.endpoint": self.AWS_ENDPOINT_URL,
             "s3.access.key": self.AWS_ACCESS_KEY_ID,
             "s3.secret.key": self.AWS_SECRET_ACCESS_KEY,
             "s3.region": self.AWS_DEFAULT_REGION,

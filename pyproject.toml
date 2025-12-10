@@ -24,6 +24,9 @@ dependencies = [
     "marimo>=0.17.7",
 ]
 
+[tool.uv]
+package = true
+
 [project.urls]
 Repository = "https://github.com/montanarograziano/poor-man-lakehouse"
 Documentation = "https://montanarograziano.github.io/poor-man-lakehouse/"

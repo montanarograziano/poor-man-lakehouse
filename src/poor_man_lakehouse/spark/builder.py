@@ -62,7 +62,7 @@ class IcebergNessieSparkBuilder(SparkBuilder):
             .config("spark.sql.catalog.nessie.ref", "main")
             .config("spark.sql.catalog.nessie.authentication.type", "NONE")
             .config("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
-            .config("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT)
+            .config("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT_URL)
             .config(
                 "spark.sql.catalog.nessie.io-impl",
                 "org.apache.iceberg.aws.s3.S3FileIO",
@@ -71,7 +71,7 @@ class IcebergNessieSparkBuilder(SparkBuilder):
             .config("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
             .config("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
             .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
-            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT)
+            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
             .config("spark.hadoop.fs.s3a.path.style.access", "true")
             .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
             .config("spark.hadoop.fs.s3a.attempts.maximum", "1")
@@ -137,7 +137,7 @@ class IcebergLakeKeeperSparkBuilder(SparkBuilder):
                 "spark.sql.catalog.l.catalog-impl",
                 "org.apache.iceberg.nessie.NessieCatalog",
             )
-            .set("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT)
+            .set("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT_URL)
             .set("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
             .set(
                 "spark.sql.catalog.nessie.io-impl",
@@ -145,7 +145,7 @@ class IcebergLakeKeeperSparkBuilder(SparkBuilder):
             )
             .set("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
             .set("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
-            .set("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT)
+            .set("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
         )
         spark = self.root_builder.config(conf=conf).getOrCreate()
         if not spark.catalog.databaseExists("default"):
