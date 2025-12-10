@@ -63,186 +63,186 @@ services:
       minio:
         condition: service_healthy
 
-  nessie:
-    image: ghcr.io/projectnessie/nessie:latest
-    container_name: nessie
-    depends_on:
-      minio:
-        condition: service_healthy
-      postgres_db:
-        condition: service_healthy
-    restart: unless-stopped
-    ports:
-      - 19120:19120
+  # nessie:
+  #   image: ghcr.io/projectnessie/nessie:latest
+  #   container_name: nessie
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #     postgres_db:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   ports:
+  #     - 19120:19120
 
-    healthcheck:
-      test: "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /q/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"
-      interval: 5s
-      timeout: 2s
-      retries: 15
-    environment:
-    # Name of the default warehouse
-      - nessie.catalog.default-warehouse=warehouse
-    # The base location of the warehouse named "warehouse"
-      - nessie.catalog.warehouses.warehouse.location=${WAREHOUSE_BUCKET:-s3://warehouse}
-    # JDBC URL for Postgres
-      - nessie.version.store.type=JDBC2
-      - nessie.version.store.persist.jdbc.datasource=postgresql
-      - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://postgres_db:5432/${POSTGRES_DB:-catalog_db}
-      - quarkus.datasource.postgresql.username=${POSTGRES_USER:-user}
-      - quarkus.datasource.postgresql.password=${POSTGRES_PASSWORD:-password}
-    # S3 as object storage
-    # Default/global S3 configuration settings
-      - nessie.catalog.service.s3.default-options.region=${AWS_DEFAULT_REGION:-eu-central-1}
-      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
-      - my-secrets-default.name=${AWS_ACCESS_KEY_ID:-minioadmin}
-      - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
-    # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
-      - nessie.catalog.service.s3.default-options.endpoint=${AWS_ENDPOINT:-http://minio:9000}
-      # - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
-      - nessie.catalog.service.s3.default-options.path-style-access=true
-    volumes:
-      - ./configs/nessie/data:/var/lib/nessie/data
+  #   healthcheck:
+  #     test: "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /q/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"
+  #     interval: 5s
+  #     timeout: 2s
+  #     retries: 15
+  #   environment:
+  #   # Name of the default warehouse
+  #     - nessie.catalog.default-warehouse=warehouse
+  #   # The base location of the warehouse named "warehouse"
+  #     - nessie.catalog.warehouses.warehouse.location=${WAREHOUSE_BUCKET:-s3://warehouse}
+  #   # JDBC URL for Postgres
+  #     - nessie.version.store.type=JDBC2
+  #     - nessie.version.store.persist.jdbc.datasource=postgresql
+  #     - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://postgres_db:5432/${POSTGRES_DB:-catalog_db}
+  #     - quarkus.datasource.postgresql.username=${POSTGRES_USER:-user}
+  #     - quarkus.datasource.postgresql.password=${POSTGRES_PASSWORD:-password}
+  #   # S3 as object storage
+  #   # Default/global S3 configuration settings
+  #     - nessie.catalog.service.s3.default-options.region=${AWS_DEFAULT_REGION:-eu-central-1}
+  #     - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
+  #     - my-secrets-default.name=${AWS_ACCESS_KEY_ID:-minioadmin}
+  #     - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
+  #   # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
+  #     - nessie.catalog.service.s3.default-options.endpoint=${AWS_ENDPOINT:-http://minio:9000}
+  #     # - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
+  #     - nessie.catalog.service.s3.default-options.path-style-access=true
+  #   volumes:
+  #     - ./configs/nessie/data:/var/lib/nessie/data
 
 
-  dremio:
-    platform: linux/x86_64
-    image: dremio/dremio-oss:latest
-    ports:
-      - 9047:9047
-      - 31010:31010
-      - 32010:32010
-    container_name: dremio
-    depends_on:
-      minio:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9047"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    environment:
-      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-      DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
-    volumes:
-      - ./configs/dremio/data:/opt/dremio/data
-      - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
-      - ./configs/dremio/logs:/opt/dremio/logs
-      - ./configs/dremio/local:/localFiles
-      - ./configs/dremio/plugins:/opt/dremio/plugins
+  # dremio:
+  #   platform: linux/x86_64
+  #   image: dremio/dremio-oss:latest
+  #   ports:
+  #     - 9047:9047
+  #     - 31010:31010
+  #     - 32010:32010
+  #   container_name: dremio
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9047"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   environment:
+  #     DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+  #     DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+  #     DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
+  #   volumes:
+  #     - ./configs/dremio/data:/opt/dremio/data
+  #     - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
+  #     - ./configs/dremio/logs:/opt/dremio/logs
+  #     - ./configs/dremio/local:/localFiles
+  #     - ./configs/dremio/plugins:/opt/dremio/plugins
 
-  dremio-init-catalog:
-    image: alpine/curl:latest
-    container_name: dremio-init-catalog
-    depends_on:
-      dremio:
-        condition: service_healthy
-      nessie:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    env_file:  .env
-    environment:
-      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-      DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://minio:9000}
-      NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
-    volumes:
-      - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
-    entrypoint: /usr/local/bin/init_dremio.sh
+  # dremio-init-catalog:
+  #   image: alpine/curl:latest
+  #   container_name: dremio-init-catalog
+  #   depends_on:
+  #     dremio:
+  #       condition: service_healthy
+  #     nessie:
+  #       condition: service_healthy
+  #     minio:
+  #       condition: service_healthy
+  #   env_file:  .env
+  #   environment:
+  #     DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+  #     DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+  #     DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
+  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+  #     AWS_ENDPOINT: ${AWS_ENDPOINT:-http://minio:9000}
+  #     NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
+  #   volumes:
+  #     - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
+  #   entrypoint: /usr/local/bin/init_dremio.sh
 
-  lakekeeper:
-    image: &lakekeeper-image ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
-    pull_policy: &lakekeeper-pull-policy always
-    environment:
-      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
-      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-    command: [ "serve" ]
-    healthcheck:
-      test: [ "CMD", "/home/nonroot/lakekeeper", "healthcheck" ]
-      interval: 1s
-      timeout: 10s
-      retries: 3
-      start_period: 3s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      minio:
-        condition: service_healthy
-      postgres_db:
-        condition: service_healthy
-      minio-init-bucket:
-        condition: service_completed_successfully
-    ports:
-      - "8181:8181"
+  # lakekeeper:
+  #   image: &lakekeeper-image ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
+  #   pull_policy: &lakekeeper-pull-policy always
+  #   environment:
+  #     - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+  #     - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+  #     - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+  #   command: [ "serve" ]
+  #   healthcheck:
+  #     test: [ "CMD", "/home/nonroot/lakekeeper", "healthcheck" ]
+  #     interval: 1s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 3s
+  #   depends_on:
+  #     migrate:
+  #       condition: service_completed_successfully
+  #     minio:
+  #       condition: service_healthy
+  #     postgres_db:
+  #       condition: service_healthy
+  #     minio-init-bucket:
+  #       condition: service_completed_successfully
+  #   ports:
+  #     - "8181:8181"
 
-  migrate:
-    image: *lakekeeper-image
-    pull_policy: *lakekeeper-pull-policy
-    environment:
-      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
-      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-    restart: "no"
-    command: [ "migrate" ]
-    depends_on:
-      postgres_db:
-        condition: service_healthy
+  # migrate:
+  #   image: *lakekeeper-image
+  #   pull_policy: *lakekeeper-pull-policy
+  #   environment:
+  #     - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+  #     - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+  #     - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+  #   restart: "no"
+  #   command: [ "migrate" ]
+  #   depends_on:
+  #     postgres_db:
+  #       condition: service_healthy
 
-  bootstrap:
-    image: curlimages/curl
-    depends_on:
-      lakekeeper:
-        condition: service_healthy
-    restart: "no"
-    command:
-      - -w
-      - "%{http_code}"
-      - "-X"
-      - "POST"
-      - "-v"
-      - "http://lakekeeper:8181/management/v1/bootstrap"
-      - "-H"
-      - "Content-Type: application/json"
-      - "--data"
-      - '{"accept-terms-of-use": true}'
-      - "-o"
-      - "/dev/null"
-      # - "--fail-with-body"
+  # bootstrap:
+  #   image: curlimages/curl
+  #   depends_on:
+  #     lakekeeper:
+  #       condition: service_healthy
+  #   restart: "no"
+  #   command:
+  #     - -w
+  #     - "%{http_code}"
+  #     - "-X"
+  #     - "POST"
+  #     - "-v"
+  #     - "http://lakekeeper:8181/management/v1/bootstrap"
+  #     - "-H"
+  #     - "Content-Type: application/json"
+  #     - "--data"
+  #     - '{"accept-terms-of-use": true}'
+  #     - "-o"
+  #     - "/dev/null"
+  #     # - "--fail-with-body"
 
-  initialwarehouse:
-    image: curlimages/curl
-    depends_on:
-      lakekeeper:
-        condition: service_healthy
-      bootstrap:
-        condition: service_completed_successfully
-      minio-init-bucket:
-        condition: service_completed_successfully
-    restart: "no"
-    command:
-      - -w
-      - "%{http_code}"
-      - "-X"
-      - "POST"
-      - "-v"
-      - "http://lakekeeper:8181/management/v1/warehouse"
-      - "-H"
-      - "Content-Type: application/json"
-      - "--data"
-      - "@create-default-warehouse.json"
-      - "-o"
-      - "/dev/null"
-      # - "--fail-with-body"
-    volumes:
-      - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
+  # initialwarehouse:
+  #   image: curlimages/curl
+  #   depends_on:
+  #     lakekeeper:
+  #       condition: service_healthy
+  #     bootstrap:
+  #       condition: service_completed_successfully
+  #     minio-init-bucket:
+  #       condition: service_completed_successfully
+  #   restart: "no"
+  #   command:
+  #     - -w
+  #     - "%{http_code}"
+  #     - "-X"
+  #     - "POST"
+  #     - "-v"
+  #     - "http://lakekeeper:8181/management/v1/warehouse"
+  #     - "-H"
+  #     - "Content-Type: application/json"
+  #     - "--data"
+  #     - "@create-default-warehouse.json"
+  #     - "-o"
+  #     - "/dev/null"
+  #     # - "--fail-with-body"
+  #   volumes:
+  #     - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
 
   # spark-master:
   #   image: bitnami/spark:4.0.0
