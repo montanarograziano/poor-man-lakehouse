@@ -24,13 +24,13 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set minio ${AWS_ENDPOINT} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
+      /usr/bin/mc alias set minio ${AWS_ENDPOINT_URL} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
       /usr/bin/mc ls minio/warehouse || /usr/bin/mc mb minio/warehouse
       "
     environment:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT: ${AWS_ENDPOINT:-http://minio:9000}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
 
   postgres_db:
     image: postgres:17
@@ -98,7 +98,7 @@ services:
   #     - my-secrets-default.name=${AWS_ACCESS_KEY_ID:-minioadmin}
   #     - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
   #   # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
-  #     - nessie.catalog.service.s3.default-options.endpoint=${AWS_ENDPOINT:-http://minio:9000}
+  #     - nessie.catalog.service.s3.default-options.endpoint=${AWS_ENDPOINT_URL:-http://minio:9000}
   #     # - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
   #     - nessie.catalog.service.s3.default-options.path-style-access=true
   #   volumes:
@@ -151,7 +151,7 @@ services:
   #     DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
   #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
   #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-  #     AWS_ENDPOINT: ${AWS_ENDPOINT:-http://minio:9000}
+  #     AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
   #     NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
   #   volumes:
   #     - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
@@ -261,7 +261,7 @@ services:
   #     # Minio credentials for Spark to access S3-compatible storage
   #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
   #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniopassword}
-  #     AWS_ENDPOINT: http://minio:9000
+  #     AWS_ENDPOINT_URL: http://minio:9000
   #     # Spark configs for Minio (S3A) and Unity Catalog
   #     SPARK_CONF_DIR: /opt/spark/conf
   #   volumes:
@@ -287,7 +287,7 @@ services:
   #     # Minio credentials for Spark worker
   #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
   #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniopassword}
-  #     AWS_ENDPOINT: http://minio:9000
+  #     AWS_ENDPOINT_URL: http://minio:9000
   #     SPARK_CONF_DIR: /opt/spark/conf
   #   volumes:
   #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config

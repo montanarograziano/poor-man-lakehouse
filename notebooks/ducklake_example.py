@@ -7,7 +7,9 @@ app = marimo.App(width="full")
 @app.cell
 def _():
     import marimo as mo
+
     from poor_man_lakehouse.config import settings
+
     return mo, settings
 
 
@@ -25,7 +27,7 @@ def _(mo, settings):
                 TYPE S3,
                 KEY_ID '{settings.AWS_ACCESS_KEY_ID}',
                 SECRET '{settings.AWS_SECRET_ACCESS_KEY}',
-                ENDPOINT '{settings.AWS_ENDPOINT}',
+                ENDPOINT '{settings.AWS_ENDPOINT_URL}',
                 URL_STYLE 'path',
                 USE_SSL false
         );
