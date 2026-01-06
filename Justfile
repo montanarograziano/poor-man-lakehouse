@@ -9,7 +9,6 @@ install:
     {{just_executable()}} needs uv
     uv sync --all-groups
     uv run prek install
-    uv pip install -e .
 
 # Update dependencies and pre-commit hooks
 update:
