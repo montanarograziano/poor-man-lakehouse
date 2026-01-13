@@ -23,6 +23,7 @@ dependencies = [
     "marimo>=0.17.7",
     "pysail==0.4.6",
     "pyspark[connect,sql]==4.0.0",
+    "psycopg2-binary>=2.9.11",
 ]
 
 [tool.uv]
