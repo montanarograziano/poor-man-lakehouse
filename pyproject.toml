@@ -18,10 +18,10 @@ dependencies = [
     "deltalake>=1.3.1",
     "loguru>=0.7.3",
     "pydantic-settings>=2.9.1",
-    "duckdb>=1.3.0",
+    "duckdb>=1.4.3",
     "setuptools>=80.9.0",
     "marimo>=0.17.7",
-    "pysail==0.4.4",
+    "pysail==0.4.6",
     "pyspark[connect,sql]==4.0.0",
 ]
 
