@@ -37,6 +37,61 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
         ).getOrCreate()
 
 
+class PostgresCatalogSparkBuilder(SparkBuilder):
+    """Builder for Spark session with Postgres catalog support."""
+
+    def get_spark_session(self) -> SparkSession:
+        extra_packages = [
+            f"org.apache.iceberg:iceberg-spark-runtime-4.0_{SCALA_VERSION}:1.10.1",
+            "org.postgresql:postgresql:42.7.3",
+            "org.apache.hadoop:hadoop-aws:3.4.1",
+        ]
+        extra_jars = ",".join(extra_packages)
+
+        spark = (
+            self.root_builder.config("spark.jars.packages", extra_jars)
+            .config(
+                f"spark.sql.catalog.{settings.CATALOG}",
+                "org.apache.iceberg.spark.SparkCatalog",
+            )
+            .config(f"spark.sql.catalog.{settings.CATALOG}.type", "jdbc")
+            .config(
+                f"spark.sql.catalog.{settings.CATALOG}.uri",
+                f"jdbc:postgresql://{settings.POSTGRES_HOST}/{settings.POSTGRES_DB}",
+            )
+            .config(
+                f"spark.sql.catalog.{settings.CATALOG}.jdbc.user",
+                settings.POSTGRES_USER,
+            )
+            .config(
+                f"spark.sql.catalog.{settings.CATALOG}.jdbc.password",
+                settings.POSTGRES_PASSWORD,
+            )
+            .config(
+                f"spark.sql.catalog.{settings.CATALOG}.warehouse",
+                settings.WAREHOUSE_BUCKET,  # needs to use s3a://
+            )
+            .config("spark.sql.defaultCatalog", settings.CATALOG)
+            # Minio / S3 Settings
+            .config("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
+            .config("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
+            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
+            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
+            .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config(
+                "spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"
+            )
+            .getOrCreate()
+        )
+        spark.catalog.setCurrentCatalog(settings.CATALOG)
+
+        if not spark.catalog.databaseExists(f"{settings.CATALOG}.default"):
+            spark.sql(f"CREATE DATABASE {settings.CATALOG}.default")
+        spark.catalog.setCurrentDatabase("default")
+        return spark
+
+
 class IcebergNessieSparkBuilder(SparkBuilder):
     """Builder for Spark session with Iceberg and Nessie support."""
 
@@ -163,5 +218,7 @@ def retrieve_current_spark_session() -> SparkSession:
         return IcebergNessieSparkBuilder().get_spark_session()
     elif settings.CATALOG == "lake_keeper":
         return IcebergLakeKeeperSparkBuilder().get_spark_session()
+    elif settings.CATALOG == "postgres":
+        return PostgresCatalogSparkBuilder().get_spark_session()
     else:
         raise ValueError(f"Unsupported catalog: {settings.CATALOG}")

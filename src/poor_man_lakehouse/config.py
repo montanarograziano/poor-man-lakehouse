@@ -30,9 +30,10 @@ class Settings(BaseSettings):
 
     # AWS Credentials
     AWS_DEFAULT_REGION: str = "eu-central-1"
+    AWS_REGION: str = ""
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_ENDPOINT_URL: str = "http://localhost:9000"
+    AWS_ENDPOINT_URL: str = "http://minio:9000"
     MINIO_ENDPOINT: str = "http://minio:9000"
     AWS_SESSION_TOKEN: str = ""  # not necessary locally
     S3_STORAGE_OPTIONS: dict = {}
@@ -70,7 +71,7 @@ class Settings(BaseSettings):
 
     # AWS Path
     BUCKET_NAME: str = "warehouse"
-    WAREHOUSE_BUCKET: str = "s3://warehouse/"
+    WAREHOUSE_BUCKET: str = "s3a://warehouse/"
 
     def _configure_data_path(self):
         """Configure S3 storage options."""
