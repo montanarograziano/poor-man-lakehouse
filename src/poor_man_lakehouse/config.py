@@ -88,8 +88,8 @@ class Settings(BaseSettings):
 
         self.ICEBERG_STORAGE_OPTIONS = {
             "s3.endpoint": self.AWS_ENDPOINT_URL,
-            "s3.access.key": self.AWS_ACCESS_KEY_ID,
-            "s3.secret.key": self.AWS_SECRET_ACCESS_KEY,
+            "s3.access-key-id": self.AWS_ACCESS_KEY_ID,
+            "s3.secret-access-key": self.AWS_SECRET_ACCESS_KEY,
             "s3.region": self.AWS_DEFAULT_REGION,
             "warehouse": self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
         }
