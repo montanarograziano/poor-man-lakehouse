@@ -33,7 +33,7 @@ services:
       AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
 
   postgres_db:
-    image: postgres:17
+    image: postgres:17.5
     ports:
       - "5432:5432"
 
