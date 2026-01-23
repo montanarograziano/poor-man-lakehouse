@@ -294,8 +294,8 @@ class DremioConnection:
                 "storageProvider": "AWS",
                 "awsRootPath": "warehouse",
                 "credentialType": "ACCESS_KEY",
-                "awsAccessKey": "minioadmin",
-                "awsAccessSecret": "miniopassword",
+                "awsAccessKey": settings.AWS_ACCESS_KEY_ID,
+                "awsAccessSecret": settings.AWS_SECRET_ACCESS_KEY,
                 "azureAuthenticationType": "ACCESS_KEY",
                 "googleAuthenticationType": "SERVICE_ACCOUNT_KEYS",
                 "propertyList": [

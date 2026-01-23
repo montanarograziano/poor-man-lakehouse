@@ -3,7 +3,11 @@ import sys
 from functools import cache
 
 from loguru import logger
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class SettingsError(Exception):
+    """Raised when settings configuration fails."""
 
 
 class Settings(BaseSettings):
@@ -13,6 +17,12 @@ class Settings(BaseSettings):
 
     - https://pydantic-docs.helpmanual.io/usage/settings/.
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # Application Path
     APP_NAME: str = "Poor Man Lakehouse"
@@ -95,10 +105,9 @@ class Settings(BaseSettings):
         }
 
     def _setup_logger(self) -> None:
+        """Configure loguru logger with stderr and file handlers."""
         logger.remove()  # to remove previous handlers and reset
-        self.LOG_FILE_NAME: str = self.LOG_FILE_NAME
-        self.LOG_FOLDER: str = self.LOG_FOLDER
-        self.LOG_FILE_PATH: str = os.path.join(self.LOG_FOLDER, self.LOG_FILE_NAME)
+        log_file_path = os.path.join(self.LOG_FOLDER, self.LOG_FILE_NAME)
         logger.add(
             sink=sys.stderr,
             colorize=True,
@@ -109,7 +118,7 @@ class Settings(BaseSettings):
             diagnose=False,
         )
         logger.add(
-            sink=self.LOG_FILE_PATH,
+            sink=log_file_path,
             rotation=self.LOG_ROTATION_SIZE,
             retention=self.LOG_RETENTION,
             colorize=True,
@@ -123,16 +132,24 @@ class Settings(BaseSettings):
 
 
 @cache
-def get_settings(settings: Settings = Settings()) -> Settings:
-    """Generate and get the settings."""
+def get_settings() -> Settings:
+    """Generate and get the settings.
+
+    Returns:
+        Configured Settings instance.
+
+    Raises:
+        SettingsError: If settings initialization fails.
+    """
     try:
+        settings = Settings()
         settings._configure_data_path()
         settings._setup_logger()
-        return settings  # noqa
+        return settings
 
-    except Exception as message:
-        logger.error(f"Error: impossible to get the settings: {message}")
-        raise Exception(f"Error importing settings: {message}") from message
+    except Exception as e:
+        logger.error(f"Error: impossible to get the settings: {e}")
+        raise SettingsError(f"Error importing settings: {e}") from e
 
 
 def reload_settings() -> Settings:
