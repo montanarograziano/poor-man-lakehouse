@@ -46,6 +46,15 @@ class SparkBuilder(ABC):
     # Iceberg SQL extensions for all implementations
     ICEBERG_EXTENSIONS: ClassVar[str] = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
 
+    @property
+    def catalog_name(self) -> str:
+        """Return the catalog name for this builder.
+
+        Default implementation uses settings.CATALOG_NAME.
+        Subclasses can override for custom catalog names.
+        """
+        return settings.CATALOG_NAME
+
     def __init__(self, app_name: str = "Poor Man Lakehouse") -> None:
         """Initialize the builder with application name.
 
@@ -141,7 +150,7 @@ class PostgresCatalogSparkBuilder(SparkBuilder):
     """
 
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        catalog = settings.CATALOG
+        catalog = self.catalog_name
         jdbc_uri = f"jdbc:postgresql://{settings.POSTGRES_HOST}/{settings.POSTGRES_DB}"
 
         return (
@@ -157,7 +166,7 @@ class PostgresCatalogSparkBuilder(SparkBuilder):
     def get_spark_session(self) -> SparkSession:
         """Get a Spark session configured for PostgreSQL-backed Iceberg catalog."""
         spark = super().get_spark_session()
-        self._ensure_default_database(spark, settings.CATALOG)
+        self._ensure_default_database(spark, self.catalog_name)
         return spark
 
 
@@ -195,10 +204,8 @@ class NessieCatalogSparkBuilder(SparkBuilder):
     Check https://projectnessie.org for the latest compatible versions.
     """
 
-    CATALOG_NAME: ClassVar[str] = "nessie"
-
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        catalog = self.CATALOG_NAME
+        catalog = self.catalog_name
 
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
@@ -215,7 +222,7 @@ class NessieCatalogSparkBuilder(SparkBuilder):
     def get_spark_session(self) -> SparkSession:
         """Get a Spark session configured for the Nessie catalog."""
         spark = super().get_spark_session()
-        self._ensure_default_database(spark, self.CATALOG_NAME)
+        self._ensure_default_database(spark, self.catalog_name)
         return spark
 
 
@@ -225,10 +232,8 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
     Uses Lakekeeper's REST catalog interface for Iceberg tables.
     """
 
-    CATALOG_NAME: ClassVar[str] = "lakekeeper"
-
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        catalog = self.CATALOG_NAME
+        catalog = self.catalog_name
 
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
@@ -243,7 +248,7 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
     def get_spark_session(self) -> SparkSession:
         """Get a Spark session configured for the Lakekeeper catalog."""
         spark = super().get_spark_session()
-        self._ensure_default_database(spark, self.CATALOG_NAME)
+        self._ensure_default_database(spark, self.catalog_name)
         return spark
 
 
