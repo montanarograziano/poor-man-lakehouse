@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     DREMIO_SERVER_URI: str = "http://dremio:9047"
     ARROW_ENDPOINT: str = "grpc://dremio:32010"
     DREMIO_USERNAME: str = "dremio"
-    DREMIO_ROOT_PASSWORD: str = "dremio123"
+    DREMIO_ROOT_PASSWORD: str = ""
     DREMIO_ROOT_EMAIL: str = "admin@example.com"
 
     # Spark settings
@@ -75,7 +75,6 @@ class Settings(BaseSettings):
 
     def _configure_data_path(self):
         """Configure S3 storage options."""
-
         self.S3_STORAGE_OPTIONS = {
             "AWS_ACCESS_KEY_ID": self.AWS_ACCESS_KEY_ID,
             "AWS_SECRET_ACCESS_KEY": self.AWS_SECRET_ACCESS_KEY,
