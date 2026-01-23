@@ -15,9 +15,12 @@ update:
     uv sync --all-groups --update-packages
     uv run prek auto-update
 
-# Run pre-commit hooks
+# Run linters
 lint:
-    uv run prek run
+    {{just_executable()}} needs uv
+    uv run ruff format src tests
+    uv run ruff check src tests --fix --unsafe-fixes
+    uv run mypy src tests
 
 # Run all tests
 test:
@@ -47,7 +50,7 @@ logs:
 
 
 # Commit with conventional commits
-@commit:
+commit:
     uv run cz commit
 
 alias c := commit
