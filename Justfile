@@ -26,6 +26,10 @@ lint:
 test:
     uv run pytest tests
 
+# Run all tests with coverage
+test-coverage:
+    uv run pytest --cov=src --cov-report=term-missing --cov-report=html 
+
 # Launch docker compose with optional profile
 # Usage: just up              (core only: minio + postgres)
 #        just up nessie       (core + Nessie catalog)
