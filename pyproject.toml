@@ -68,7 +68,7 @@ show_error_codes = true
 no_implicit_optional = true
 warn_return_any = true
 warn_unused_ignores = true
-exclude = ["scripts", "docs", "test", "pyarrow"]
+exclude = ["scripts", "docs", "pyarrow"]
 
 [[tool.mypy.overrides]]
 module = "pyarrow.*"
