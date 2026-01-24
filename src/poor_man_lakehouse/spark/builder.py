@@ -1,6 +1,15 @@
-from abc import ABC, abstractmethod
+"""Spark session builders for different catalog implementations.
 
-import pyspark
+All builders share common JARs (Iceberg, Delta, Hadoop-AWS) for Spark 4.0.0 compatibility.
+Delta support is enabled via configure_spark_with_delta_pip for all builders, allowing
+path-based Delta table access (e.g., spark.read.format("delta").load("s3a://...")).
+The main difference between implementations is the catalog configuration for Iceberg tables.
+"""
+
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import ClassVar
+
 from delta import configure_spark_with_delta_pip
 from loguru import logger
 from pyspark.sql import SparkSession
@@ -8,217 +17,306 @@ from pyspark.sql import SparkSession
 from poor_man_lakehouse.config import settings
 
 SCALA_VERSION = "2.13"
+SPARK_MAJOR_MINOR = "4.0"
+
+# Common packages for all Spark 4.0.0 implementations
+# These provide Iceberg, Delta (via configure_spark_with_delta_pip), and S3 support
+COMMON_PACKAGES: list[str] = [
+    f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_MAJOR_MINOR}_{SCALA_VERSION}:1.10.1",
+    "org.apache.iceberg:iceberg-aws-bundle:1.10.1",
+    "org.apache.hadoop:hadoop-aws:3.4.1",
+    "org.postgresql:postgresql:42.7.3",
+]
+
+
+class CatalogType(str, Enum):
+    """Supported catalog types."""
+
+    POSTGRES = "postgres"
+    UNITY_CATALOG = "unity_catalog"
+    NESSIE = "nessie"
+    LAKEKEEPER = "lakekeeper"
 
 
 class SparkBuilder(ABC):
-    root_builder = (
-        SparkSession.Builder()
-        .appName("Poor Man Lakehouse")
-        .master(settings.SPARK_MASTER)
-    )
+    """Abstract base class for Spark session builders.
+
+    Provides common configuration for S3/Minio access and shared packages.
+    Subclasses only need to implement catalog-specific configuration.
+    """
+
+    # SQL extensions for Iceberg and Delta support
+    ICEBERG_EXTENSIONS: ClassVar[str] = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    DELTA_EXTENSIONS: ClassVar[str] = "io.delta.sql.DeltaSparkSessionExtension"
+
+    @property
+    def catalog_name(self) -> str:
+        """Return the catalog name for this builder.
+
+        Default implementation uses settings.CATALOG_NAME.
+        Subclasses can override for custom catalog names.
+        """
+        return settings.CATALOG_NAME
+
+    def __init__(self, app_name: str = "Poor Man Lakehouse") -> None:
+        """Initialize the builder with application name.
+
+        Args:
+            app_name: Name of the Spark application.
+        """
+        self._app_name = app_name
+
+    def _create_base_builder(self) -> SparkSession.Builder:
+        """Create a fresh SparkSession builder with common configuration."""
+        return SparkSession.builder.appName(self._app_name).master(settings.SPARK_MASTER)
+
+    def _get_packages(self) -> list[str]:
+        """Get the list of Maven packages to include.
+
+        Subclasses can override to add additional packages.
+        """
+        return COMMON_PACKAGES.copy()
+
+    def _configure_s3(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        """Configure S3/Minio access settings.
+
+        Args:
+            builder: The SparkSession builder to configure.
+
+        Returns:
+            The configured builder.
+        """
+        return (
+            builder.config("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
+            .config("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
+            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
+            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
+            .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        )
+
+    def _configure_common(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        """Apply common configuration to the builder.
+
+        Args:
+            builder: The SparkSession builder to configure.
+
+        Returns:
+            The configured builder with extensions and S3 settings.
+            Note: Packages are handled via configure_spark_with_delta_pip in get_spark_session.
+        """
+        extensions = f"{self.ICEBERG_EXTENSIONS},{self.DELTA_EXTENSIONS}"
+        builder = builder.config("spark.sql.extensions", extensions)
+        # DeltaCatalog on spark_catalog enables path-based Delta operations
+        # This is separate from the named Iceberg catalog and they coexist
+        builder = builder.config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        return self._configure_s3(builder)
 
     @abstractmethod
+    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        """Configure catalog-specific settings.
+
+        Args:
+            builder: The SparkSession builder to configure.
+
+        Returns:
+            The configured builder with catalog settings.
+        """
+
+    def _ensure_default_database(self, spark: SparkSession, catalog_name: str) -> None:
+        """Ensure the default database exists in the catalog.
+
+        Args:
+            spark: The active SparkSession.
+            catalog_name: Name of the catalog to use.
+        """
+        spark.catalog.setCurrentCatalog(catalog_name)
+        if not spark.catalog.databaseExists(f"{catalog_name}.default"):
+            spark.sql(f"CREATE DATABASE {catalog_name}.default")
+        spark.catalog.setCurrentDatabase("default")
+
     def get_spark_session(self) -> SparkSession:
-        """Abstract method to get a configured Spark session."""
-        pass
+        """Build and return a configured Spark session with Iceberg and Delta support.
 
-
-class DeltaUnityCatalogSparkBuilder(SparkBuilder):
-    """Builder for Spark session with Delta Lake and Unity Catalog support."""
-
-    extra_packages = [
-        "org.apache.hadoop:hadoop-aws:3.4.0",
-        f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.0",
-    ]
-
-    def get_spark_session(self) -> SparkSession:
-        return configure_spark_with_delta_pip(
-            self.root_builder, extra_packages=self.extra_packages
-        ).getOrCreate()
+        Returns:
+            A configured SparkSession instance with both Iceberg catalog access
+            and Delta Lake path-based access enabled.
+        """
+        builder = self._create_base_builder()
+        builder = self._configure_common(builder)
+        builder = self._configure_catalog(builder)
+        extra_packages = self._get_packages()
+        return configure_spark_with_delta_pip(builder, extra_packages=extra_packages).getOrCreate()
 
 
 class PostgresCatalogSparkBuilder(SparkBuilder):
-    """Builder for Spark session with Postgres catalog support."""
+    """Builder for Spark session with PostgreSQL-backed Iceberg catalog.
+
+    Uses PostgreSQL as the Iceberg catalog backend via JDBC.
+    This is the tested and recommended implementation.
+    """
+
+    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        catalog = self.catalog_name
+        jdbc_uri = f"jdbc:postgresql://{settings.POSTGRES_HOST}/{settings.POSTGRES_DB}"
+
+        return (
+            builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
+            .config(f"spark.sql.catalog.{catalog}.type", "jdbc")
+            .config(f"spark.sql.catalog.{catalog}.uri", jdbc_uri)
+            .config(f"spark.sql.catalog.{catalog}.jdbc.user", settings.POSTGRES_USER)
+            .config(f"spark.sql.catalog.{catalog}.jdbc.password", settings.POSTGRES_PASSWORD)
+            .config(f"spark.sql.catalog.{catalog}.warehouse", settings.WAREHOUSE_BUCKET)
+            .config("spark.sql.defaultCatalog", catalog)
+        )
 
     def get_spark_session(self) -> SparkSession:
-        extra_packages = [
-            f"org.apache.iceberg:iceberg-spark-runtime-4.0_{SCALA_VERSION}:1.10.1",
-            "org.postgresql:postgresql:42.7.3",
-            "org.apache.hadoop:hadoop-aws:3.4.1",
-        ]
-        extra_jars = ",".join(extra_packages)
-
-        spark = (
-            self.root_builder.config("spark.jars.packages", extra_jars)
-            .config(
-                f"spark.sql.catalog.{settings.CATALOG}",
-                "org.apache.iceberg.spark.SparkCatalog",
-            )
-            .config(f"spark.sql.catalog.{settings.CATALOG}.type", "jdbc")
-            .config(
-                f"spark.sql.catalog.{settings.CATALOG}.uri",
-                f"jdbc:postgresql://{settings.POSTGRES_HOST}/{settings.POSTGRES_DB}",
-            )
-            .config(
-                f"spark.sql.catalog.{settings.CATALOG}.jdbc.user",
-                settings.POSTGRES_USER,
-            )
-            .config(
-                f"spark.sql.catalog.{settings.CATALOG}.jdbc.password",
-                settings.POSTGRES_PASSWORD,
-            )
-            .config(
-                f"spark.sql.catalog.{settings.CATALOG}.warehouse",
-                settings.WAREHOUSE_BUCKET,  # needs to use s3a://
-            )
-            .config("spark.sql.defaultCatalog", settings.CATALOG)
-            # Minio / S3 Settings
-            .config("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
-            .config("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
-            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
-            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
-            .config("spark.hadoop.fs.s3a.path.style.access", "true")
-            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-            .config(
-                "spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"
-            )
-            .getOrCreate()
-        )
-        spark.catalog.setCurrentCatalog(settings.CATALOG)
-
-        if not spark.catalog.databaseExists(f"{settings.CATALOG}.default"):
-            spark.sql(f"CREATE DATABASE {settings.CATALOG}.default")
-        spark.catalog.setCurrentDatabase("default")
+        """Get a Spark session configured for PostgreSQL-backed Iceberg catalog."""
+        spark = super().get_spark_session()
+        self._ensure_default_database(spark, self.catalog_name)
         return spark
 
 
-class IcebergNessieSparkBuilder(SparkBuilder):
-    """Builder for Spark session with Iceberg and Nessie support."""
+class DeltaUnityCatalogSparkBuilder(SparkBuilder):
+    """Builder for Spark session with Delta Lake and Unity Catalog support.
+
+    Uses configure_spark_with_delta_pip for Delta Lake JAR management.
+    """
+
+    UNITY_CATALOG_PACKAGE: ClassVar[str] = f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.0"
+
+    def _get_packages(self) -> list[str]:
+        packages = super()._get_packages()
+        packages.append(self.UNITY_CATALOG_PACKAGE)
+        return packages
+
+    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        catalog = self.catalog_name
+        return builder.config("spark.sql.defaultCatalog", catalog).config(
+            f"spark.sql.catalog.{catalog}.renewCredential.enabled", "true"
+        )
 
     def get_spark_session(self) -> SparkSession:
-        extra_packages = [
-            f"org.apache.iceberg:iceberg-spark-runtime-3.5_{SCALA_VERSION}:1.9.2",
-            f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.103.3",
-            "org.apache.iceberg:iceberg-aws-bundle:1.9.2",
-        ]
-        extra_jars = ",".join(extra_packages)
+        """Get a Spark session configured for Delta Lake with Unity Catalog."""
+        return super().get_spark_session()
 
-        spark = (
-            self.root_builder.config("spark.jars.packages", extra_jars)
-            .config(
-                "spark.sql.extensions",
-                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",
-            )
-            .config("spark.sql.catalog.nessie", "org.apache.iceberg.spark.SparkCatalog")
-            .config(
-                "spark.sql.catalog.nessie.uri", settings.NESSIE_PYICEBERG_SERVER_URI
-            )
-            .config("spark.sql.catalog.nessie.type", "rest")
-            .config("spark.sql.catalog.nessie.ref", "main")
-            .config("spark.sql.catalog.nessie.authentication.type", "NONE")
-            .config("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
-            .config("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT_URL)
-            .config(
-                "spark.sql.catalog.nessie.io-impl",
-                "org.apache.iceberg.aws.s3.S3FileIO",
-            )
-            .config("spark.sql.defaultCatalog", "nessie")
-            .config("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
-            .config("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
-            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
-            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
-            .config("spark.hadoop.fs.s3a.path.style.access", "true")
-            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-            .config("spark.hadoop.fs.s3a.attempts.maximum", "1")
-            .config("spark.hadoop.fs.s3a.connection.establish.timeout", "1000")
-            .config("spark.hadoop.fs.s3a.connection.timeout", "10000")
-            .config(
-                "spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"
-            )
-            .config("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .getOrCreate()
+
+class NessieCatalogSparkBuilder(SparkBuilder):
+    """Builder for Spark session with Nessie catalog.
+
+    Uses Nessie's REST catalog interface for Iceberg tables.
+
+    Note: Nessie Spark extensions for Spark 4.0 may have limited availability.
+    Check https://projectnessie.org for the latest compatible versions.
+    """
+
+    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        catalog = self.catalog_name
+
+        return (
+            builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
+            .config(f"spark.sql.catalog.{catalog}.type", "rest")
+            .config(f"spark.sql.catalog.{catalog}.uri", settings.NESSIE_PYICEBERG_SERVER_URI)
+            .config(f"spark.sql.catalog.{catalog}.ref", "main")
+            .config(f"spark.sql.catalog.{catalog}.authentication.type", "NONE")
+            .config(f"spark.sql.catalog.{catalog}.warehouse", settings.WAREHOUSE_BUCKET)
+            .config(f"spark.sql.catalog.{catalog}.s3.endpoint", settings.AWS_ENDPOINT_URL)
+            .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+            .config("spark.sql.defaultCatalog", catalog)
         )
-        spark.catalog.setCurrentCatalog("nessie")
 
-        if not spark.catalog.databaseExists("nessie.default"):
-            spark.sql("CREATE DATABASE nessie.default")
-        spark.catalog.setCurrentDatabase("default")
+    def get_spark_session(self) -> SparkSession:
+        """Get a Spark session configured for the Nessie catalog."""
+        spark = super().get_spark_session()
+        self._ensure_default_database(spark, self.catalog_name)
         return spark
 
 
-class IcebergLakeKeeperSparkBuilder(SparkBuilder):
-    """Builder for Spark session with Iceberg and LakeKeeper support."""
+class LakekeeperCatalogSparkBuilder(SparkBuilder):
+    """Builder for Spark session with Lakekeeper catalog.
 
-    CATALOG_URL = "http://lakekeeper:8181/catalog"
-    KEYCLOAK_TOKEN_ENDPOINT = (
-        "http://keycloak:8080/realms/iceberg/protocol/openid-connect/token"
-    )
-    WAREHOUSE = "warehouse"
+    Uses Lakekeeper's REST catalog interface for Iceberg tables.
+    Based on official Lakekeeper Spark documentation:
+    https://docs.lakekeeper.io/docs/nightly/engines/#spark
+    """
 
-    CLIENT_ID = "spark"
-    CLIENT_SECRET = "2OR3eRvYfSZzzZ16MlPd95jhLnOaLM52"
+    @property
+    def catalog_name(self) -> str:
+        """Return the catalog name for this builder.
 
-    SPARK_VERSION = pyspark.__version__
-    SPARK_MINOR_VERSION = ".".join(SPARK_VERSION.split(".")[:2])
-    ICEBERG_VERSION = "1.7.0"
+        Lakekeeper uses 'lakekeeper' as the catalog name regardless of settings.
+        """
+        return "lakekeeper"
+
+    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        catalog = self.catalog_name
+        # Lakekeeper REST catalog URI
+        lakekeeper_catalog_uri = f"{settings.LAKEKEEPER_SERVER_URI}/catalog"
+
+        return (
+            builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
+            .config(f"spark.sql.catalog.{catalog}.type", "rest")
+            .config(f"spark.sql.catalog.{catalog}.uri", lakekeeper_catalog_uri)
+            .config(f"spark.sql.catalog.{catalog}.warehouse", settings.WAREHOUSE_BUCKET)
+            .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+            .config("spark.sql.defaultCatalog", catalog)
+        )
 
     def get_spark_session(self) -> SparkSession:
-        extra_packages = [
-            f"org.apache.iceberg:iceberg-spark-runtime-{self.SPARK_MINOR_VERSION}_{SCALA_VERSION}:1.9.1",
-            "org.apache.iceberg:iceberg-aws-bundle:1.9.1",
-            "org.apache.hadoop:hadoop-aws:3.4.0",
-            "software.amazon.awssdk:bundle:2.31.68",
-            "software.amazon.awssdk:url-connection-client:2.31.68",
-        ]
-        conf = (
-            pyspark.SparkConf()
-            .set(
-                "spark.jars.packages",
-                ",".join(extra_packages),
-            )
-            # SQL Extensions
-            .set(
-                "spark.sql.extensions",
-                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
-            )
-            # Configuring Catalog
-            .set(
-                "spark.sql.catalog.lakekeeper", "org.apache.iceberg.spark.SparkCatalog"
-            )
-            .set("spark.sql.catalog.lakekeeper.uri", settings.LAKEKEEPER_SERVER_URI)
-            # .set("spark.sql.catalog.lakekeeper.credential", f"{self.CLIENT_ID}:{self.CLIENT_SECRET}")
-            .set("spark.sql.catalog.nessie.authentication.type", "NONE")
-            .set(
-                "spark.sql.catalog.l.catalog-impl",
-                "org.apache.iceberg.nessie.NessieCatalog",
-            )
-            .set("spark.sql.catalog.nessie.s3.endpoint", settings.AWS_ENDPOINT_URL)
-            .set("spark.sql.catalog.nessie.warehouse", settings.WAREHOUSE_BUCKET)
-            .set(
-                "spark.sql.catalog.nessie.io-impl",
-                "org.apache.iceberg.aws.s3.S3FileIO",
-            )
-            .set("spark.hadoop.fs.s3a.access.key", settings.AWS_ACCESS_KEY_ID)
-            .set("spark.hadoop.fs.s3a.secret.key", settings.AWS_SECRET_ACCESS_KEY)
-            .set("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
-        )
-        spark = self.root_builder.config(conf=conf).getOrCreate()
-        if not spark.catalog.databaseExists("default"):
-            spark.sql("CREATE DATABASE default")
-        spark.catalog.setCurrentDatabase("default")
+        """Get a Spark session configured for the Lakekeeper catalog."""
+        spark = super().get_spark_session()
+        self._ensure_default_database(spark, self.catalog_name)
         return spark
+
+
+_CATALOG_BUILDERS: dict[CatalogType, type[SparkBuilder]] = {
+    CatalogType.POSTGRES: PostgresCatalogSparkBuilder,
+    CatalogType.UNITY_CATALOG: DeltaUnityCatalogSparkBuilder,
+    CatalogType.NESSIE: NessieCatalogSparkBuilder,
+    CatalogType.LAKEKEEPER: LakekeeperCatalogSparkBuilder,
+}
+
+
+def get_spark_builder(catalog_type: CatalogType | str) -> SparkBuilder:
+    """Get the appropriate Spark builder for the given catalog type.
+
+    Args:
+        catalog_type: The catalog type (enum or string).
+
+    Returns:
+        An instance of the appropriate SparkBuilder subclass.
+
+    Raises:
+        ValueError: If the catalog type is not supported.
+    """
+    if isinstance(catalog_type, str):
+        try:
+            catalog_type = CatalogType(catalog_type)
+        except ValueError as e:
+            supported = [c.value for c in CatalogType]
+            raise ValueError(f"Unsupported catalog: {catalog_type}. Supported: {supported}") from e
+
+    builder_class = _CATALOG_BUILDERS.get(catalog_type)
+    if builder_class is None:
+        supported = [c.value for c in CatalogType]
+        raise ValueError(f"Unsupported catalog: {catalog_type}. Supported: {supported}")
+
+    return builder_class()
 
 
 def retrieve_current_spark_session() -> SparkSession:
-    """Retrieve the current Spark session, creating it if it doesn't exist."""
+    """Retrieve a Spark session configured for the current catalog setting.
+
+    Uses the CATALOG setting from configuration to determine which
+    catalog implementation to use.
+
+    Returns:
+        A configured SparkSession instance.
+
+    Raises:
+        ValueError: If the configured catalog is not supported.
+    """
     logger.debug(f"Setting up Spark session with catalog: {settings.CATALOG}")
-    if settings.CATALOG == "unity_catalog":
-        return DeltaUnityCatalogSparkBuilder().get_spark_session()
-    elif settings.CATALOG == "nessie":
-        return IcebergNessieSparkBuilder().get_spark_session()
-    elif settings.CATALOG == "lake_keeper":
-        return IcebergLakeKeeperSparkBuilder().get_spark_session()
-    elif settings.CATALOG == "postgres":
-        return PostgresCatalogSparkBuilder().get_spark_session()
-    else:
-        raise ValueError(f"Unsupported catalog: {settings.CATALOG}")
+    builder = get_spark_builder(settings.CATALOG)
+    return builder.get_spark_session()

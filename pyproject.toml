@@ -42,6 +42,7 @@ dev = [
     "mypy>=1.16.0",
     "prek>=0.2.12",
     "pytest>=8.4.0",
+    "pytest-cov>=6.0.0",
     "ruff>=0.11.13",
     "types-requests>=2.32.4.20250611",
 ]
@@ -67,7 +68,7 @@ show_error_codes = true
 no_implicit_optional = true
 warn_return_any = true
 warn_unused_ignores = true
-exclude = ["scripts", "docs", "test", "pyarrow"]
+exclude = ["scripts", "docs", "pyarrow"]
 
 [[tool.mypy.overrides]]
 module = "pyarrow.*"
@@ -76,3 +77,146 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "ibis.*"
 ignore_missing_imports = true
+
+#### RUFF
+[tool.ruff]
+line-length = 120
+indent-width = 4
+output-format = "concise"
+# Assume Python 3.10.
+target-version = "py312"
+
+# A list of file patterns to include when linting.
+# include = ["**/pyproject.toml", "*.py", "*.pyi"]
+# extend-include = ["*.ipynb"]
+
+# Always autofix, but never try to fix `F401` (unused imports).
+fix = true
+
+# Exclude a variety of commonly ignored directories (you can have some problems)
+exclude = [
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    ".venv",
+    "*ipynb_checkpoints",
+    # "*.ipynb",
+    "test/*",
+    "__init__.py",
+    "notebooks/data_explorer.py",
+]
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = ["F401"]
+# Rules: https://beta.ruff.rs/docs/rules/
+# Enable Pyflakes `E` and `F` codes by default.
+select = [
+    #default
+    "E", # pycodestyle error
+    "F", #flake8 error
+    #extra
+    "A",   # bultin shadowing
+    "B",   # flake8 bugbear
+    "BLE", # aboid bare excepts
+    "C4",  # simplify comprehensions
+    "D",   # docstyle
+    "DTZ", # datetime errors
+    "FBT", # avoid boolean trap
+    "G",   # logging format
+    "I",   # flake8-isort import
+    "N",   # pep8 naming
+    "RET", # return statements values
+    "S",   # bandit
+    "YTT", # wrong usage of sys.info
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "B008",   # do not perform function calls in argument defaults
+    "BLE001", #Do not catch blind exception: {name}
+    "C901",   # too complex
+    "D107",   # Missing docstring in __init__
+    "D203",   # 1 blank line required before class docstring
+    "D213",   # Multi-line docstring summary should start at the second line
+    "D417",   # Missing argument description in the docstring for {definition}: {name}
+    "E501",   # Line too long ({width} > {limit} characters)
+    "E501",   # line too long, handled by black
+    "D100",
+    "FBT001", # boolean trap
+    "FBT002", # boolean trap
+    "G004",   # logging statement using fstring formatting
+]
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# select = ["E4", "E7", "E9", "F"]
+# ignore = []
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 20
+
+[tool.ruff.lint.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-third-party = ["fastapi", "pydantic", "starlette"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["D104", "F401", "I002"]
+"test*.py" = ["S101", "T201"]
+"notebooks/*ipynb" = ["S608"]
+
+#### PYTEST
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = ["-v", "--strict-markers", "--tb=short"]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (require docker-compose)",
+    "slow: Slow tests",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+#### COVERAGE
+[tool.coverage.run]
+source = ["src/poor_man_lakehouse"]
+branch = true
+omit = ["*/tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+fail_under = 0
+show_missing = true

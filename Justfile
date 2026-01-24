@@ -15,30 +15,51 @@ update:
     uv sync --all-groups --update-packages
     uv run prek auto-update
 
-# Run pre-commit hooks
+# Run linters
 lint:
-    uv run prek run
+    {{just_executable()}} needs uv
+    uv run ruff format src tests
+    uv run ruff check src tests --fix --unsafe-fixes
+    uv run mypy src tests
 
 # Run all tests
 test:
     uv run pytest tests
 
-# Launch docker compose
-up:
-  {{just_executable()}} needs docker
-  docker compose up --build --detach
+# Run all tests with coverage
+test-coverage:
+    uv run pytest --cov=src --cov-report=term-missing --cov-report=html 
 
-# Stop docker compose
+# Launch docker compose with optional profile
+# Usage: just up              (core only: minio + postgres)
+#        just up nessie       (core + Nessie catalog)
+#        just up lakekeeper   (core + Lakekeeper catalog)
+#        just up dremio       (core + Nessie + Dremio)
+#        just up spark        (core + Spark cluster)
+#        just up full         (all services)
+up profile="":
+  {{just_executable()}} needs docker
+  @if [ -z "{{profile}}" ]; then \
+    docker compose up --build --detach; \
+  else \
+    docker compose --profile {{profile}} up --build --detach; \
+  fi
+
+# Stop docker compose (stops all profiles)
 down:
   {{just_executable()}} needs docker
-  docker compose down
+  docker compose --profile full down
 
 # Launch docker compose in clean environment
-up_clean:
+up-clean profile="":
   {{just_executable()}} needs docker
-  docker compose down --remove-orphans --volumes
+  docker compose --profile full down --remove-orphans --volumes
   find ./configs -type d -name "data" -exec rm -rf {} +
-  docker compose up --build --detach
+  @if [ -z "{{profile}}" ]; then \
+    docker compose up --build --detach; \
+  else \
+    docker compose --profile {{profile}} up --build --detach; \
+  fi
 
 # Read logs from Compose
 logs:
@@ -47,7 +68,7 @@ logs:
 
 
 # Commit with conventional commits
-@commit:
+commit:
     uv run cz commit
 
 alias c := commit
