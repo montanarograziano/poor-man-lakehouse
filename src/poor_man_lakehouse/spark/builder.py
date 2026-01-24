@@ -1,7 +1,9 @@
 """Spark session builders for different catalog implementations.
 
 All builders share common JARs (Iceberg, Delta, Hadoop-AWS) for Spark 4.0.0 compatibility.
-The only difference between implementations is the catalog configuration.
+Delta support is enabled via configure_spark_with_delta_pip for all builders, allowing
+path-based Delta table access (e.g., spark.read.format("delta").load("s3a://...")).
+The main difference between implementations is the catalog configuration for Iceberg tables.
 """
 
 from abc import ABC, abstractmethod
@@ -43,8 +45,9 @@ class SparkBuilder(ABC):
     Subclasses only need to implement catalog-specific configuration.
     """
 
-    # Iceberg SQL extensions for all implementations
+    # SQL extensions for Iceberg and Delta support
     ICEBERG_EXTENSIONS: ClassVar[str] = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    DELTA_EXTENSIONS: ClassVar[str] = "io.delta.sql.DeltaSparkSessionExtension"
 
     @property
     def catalog_name(self) -> str:
@@ -100,11 +103,11 @@ class SparkBuilder(ABC):
             builder: The SparkSession builder to configure.
 
         Returns:
-            The configured builder with packages and S3 settings.
+            The configured builder with extensions and S3 settings.
+            Note: Packages are handled via configure_spark_with_delta_pip in get_spark_session.
         """
-        packages = ",".join(self._get_packages())
-        builder = builder.config("spark.jars.packages", packages)
-        builder = builder.config("spark.sql.extensions", self.ICEBERG_EXTENSIONS)
+        extensions = f"{self.ICEBERG_EXTENSIONS},{self.DELTA_EXTENSIONS}"
+        builder = builder.config("spark.sql.extensions", extensions)
         return self._configure_s3(builder)
 
     @abstractmethod
@@ -131,15 +134,17 @@ class SparkBuilder(ABC):
         spark.catalog.setCurrentDatabase("default")
 
     def get_spark_session(self) -> SparkSession:
-        """Build and return a configured Spark session.
+        """Build and return a configured Spark session with Iceberg and Delta support.
 
         Returns:
-            A configured SparkSession instance.
+            A configured SparkSession instance with both Iceberg catalog access
+            and Delta Lake path-based access enabled.
         """
         builder = self._create_base_builder()
         builder = self._configure_common(builder)
         builder = self._configure_catalog(builder)
-        return builder.getOrCreate()
+        extra_packages = self._get_packages()
+        return configure_spark_with_delta_pip(builder, extra_packages=extra_packages).getOrCreate()
 
 
 class PostgresCatalogSparkBuilder(SparkBuilder):
@@ -188,11 +193,7 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
 
     def get_spark_session(self) -> SparkSession:
         """Get a Spark session configured for Delta Lake with Unity Catalog."""
-        builder = self._create_base_builder()
-        builder = self._configure_s3(builder)
-        builder = self._configure_catalog(builder)
-        extra_packages = self._get_packages()
-        return configure_spark_with_delta_pip(builder, extra_packages=extra_packages).getOrCreate()
+        return super().get_spark_session()
 
 
 class NessieCatalogSparkBuilder(SparkBuilder):
