@@ -108,6 +108,11 @@ class SparkBuilder(ABC):
         """
         extensions = f"{self.ICEBERG_EXTENSIONS},{self.DELTA_EXTENSIONS}"
         builder = builder.config("spark.sql.extensions", extensions)
+        # DeltaCatalog on spark_catalog enables path-based Delta operations
+        # This is separate from the named Iceberg catalog and they coexist
+        builder = builder.config(
+            "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        )
         return self._configure_s3(builder)
 
     @abstractmethod
