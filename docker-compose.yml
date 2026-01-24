@@ -1,14 +1,18 @@
 # Poor Man Lakehouse - Docker Compose
 #
-# Usage:
-#   docker compose up                           # Core only (minio + postgres)
+# IMPORTANT: Use ONE catalog at a time. Multiple catalogs share the same PostgreSQL
+# database and MinIO warehouse, which can cause metadata conflicts. The 'full' profile
+# is for testing only.
+#
+# Usage (pick ONE catalog):
+#   docker compose up                           # Core only (PostgreSQL JDBC catalog)
 #   docker compose --profile nessie up          # Core + Nessie catalog
 #   docker compose --profile lakekeeper up      # Core + Lakekeeper catalog
 #   docker compose --profile dremio up          # Core + Nessie + Dremio
-#   docker compose --profile spark up           # Core + Spark cluster
-#   docker compose --profile full up            # Everything
+#   docker compose --profile unity up           # Core + Unity Catalog
+#   docker compose --profile full up            # All services (TESTING ONLY)
 #
-# Combine profiles:
+# Add Spark cluster to your chosen catalog:
 #   docker compose --profile nessie --profile spark up
 
 services:
@@ -276,44 +280,44 @@ services:
   # SPARK CLUSTER (profile: spark, full)
   # =============================================================================
 
-  spark-master:
-    profiles: ["spark", "full"]
-    image: bitnami/spark:4.0.0
-    command: bin/spark-class org.apache.spark.deploy.master.Master
-    hostname: spark-master
-    ports:
-      - "8081:8080"
-      - "7077:7077"
-      - "10000:10000"
-    environment:
-      SPARK_MASTER_HOST: spark-master
-      SPARK_MASTER_PORT: 7077
-      SPARK_DRIVER_PORT: 7001
-      SPARK_BLOCKMGR_PORT: 7002
-      SPARK_WORKER_PORT: 7003
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT_URL: http://minio:9000
-      SPARK_CONF_DIR: /opt/spark/conf
-    volumes:
-      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-    depends_on:
-      minio:
-        condition: service_healthy
+  # spark-master:
+  #   profiles: ["spark", "full"]
+  #   image: bitnami/spark:4.0.0
+  #   command: bin/spark-class org.apache.spark.deploy.master.Master
+  #   hostname: spark-master
+  #   ports:
+  #     - "8081:8080"
+  #     - "7077:7077"
+  #     - "10000:10000"
+  #   environment:
+  #     SPARK_MASTER_HOST: spark-master
+  #     SPARK_MASTER_PORT: 7077
+  #     SPARK_DRIVER_PORT: 7001
+  #     SPARK_BLOCKMGR_PORT: 7002
+  #     SPARK_WORKER_PORT: 7003
+  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+  #     AWS_ENDPOINT_URL: http://minio:9000
+  #     SPARK_CONF_DIR: /opt/spark/conf
+  #   volumes:
+  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
 
-  spark-worker:
-    profiles: ["spark", "full"]
-    image: bitnami/spark:4.0.0
-    hostname: spark-worker
-    command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-    environment:
-      SPARK_MASTER_HOST: spark-master
-      SPARK_MASTER_PORT: 7077
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT_URL: http://minio:9000
-      SPARK_CONF_DIR: /opt/spark/conf
-    volumes:
-      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-    depends_on:
-      - spark-master
+  # spark-worker:
+  #   profiles: ["spark", "full"]
+  #   image: bitnami/spark:4.0.0
+  #   hostname: spark-worker
+  #   command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+  #   environment:
+  #     SPARK_MASTER_HOST: spark-master
+  #     SPARK_MASTER_PORT: 7077
+  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+  #     AWS_ENDPOINT_URL: http://minio:9000
+  #     SPARK_CONF_DIR: /opt/spark/conf
+  #   volumes:
+  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+  #   depends_on:
+  #     - spark-master
