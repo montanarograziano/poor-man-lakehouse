@@ -90,27 +90,41 @@ jupyter lab notebooks/
 
 ## Docker Compose Profiles
 
-The project uses Docker Compose profiles to manage service groups:
+The project uses Docker Compose profiles to manage service groups.
+
+> **Important**: Run **one catalog at a time**. Multiple catalogs (Nessie, Lakekeeper, Unity Catalog, PostgreSQL JDBC) share the same PostgreSQL database and MinIO warehouse. Running them simultaneously can cause metadata conflicts and confusion about which catalog "owns" which tables. The `full` profile is intended for **testing purposes only**.
 
 | Profile | Services Started | Use Case |
 |---------|-----------------|----------|
-| *(none)* | MinIO, PostgreSQL | Core infrastructure only |
+| *(none)* | MinIO, PostgreSQL | Core infrastructure only (uses PostgreSQL JDBC catalog) |
 | `nessie` | + Nessie | Iceberg catalog with Git-like versioning |
 | `lakekeeper` | + Lakekeeper + bootstrap | Alternative Iceberg REST catalog |
 | `dremio` | + Nessie + Dremio | Query federation with Arrow Flight |
 | `unity` | + Unity Catalog | Databricks Unity Catalog (experimental) |
-| `spark` | + Spark Master/Worker | Distributed Spark cluster |
-| `full` | All services | Complete stack |
+| `spark` | + Spark Master/Worker | Distributed Spark cluster (combine with a catalog profile) |
+| `full` | All services | **Testing only** - runs all catalogs simultaneously |
 
-### Combining Profiles
+### Recommended Usage
 
 ```bash
-# Nessie + Spark cluster
+# Pick ONE catalog and stick with it for your project:
+just up              # PostgreSQL JDBC catalog (simplest)
+just up nessie       # Nessie catalog (recommended for development)
+just up lakekeeper   # Lakekeeper catalog (production-ready REST catalog)
+
+# Add Spark cluster to your chosen catalog:
 docker compose --profile nessie --profile spark up -d
 
 # Stop all services
 just down
 ```
+
+### Why One Catalog at a Time?
+
+Each catalog maintains its own metadata about tables in the warehouse:
+- A table created via Nessie won't appear in Lakekeeper or the PostgreSQL catalog
+- Multiple catalogs can create conflicting metadata for the same storage paths
+- Debugging becomes difficult when multiple systems track the same data
 
 ## Configuration
 

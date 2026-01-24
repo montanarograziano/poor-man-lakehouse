@@ -194,7 +194,11 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
         return packages
 
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        return builder.config("spark.sql.defaultCatalog", settings.CATALOG)
+        catalog = self.catalog_name
+        return (
+            builder.config("spark.sql.defaultCatalog", catalog)
+            .config(f"spark.sql.catalog.{catalog}.renewCredential.enabled", "true")
+        )
 
     def get_spark_session(self) -> SparkSession:
         """Get a Spark session configured for Delta Lake with Unity Catalog."""
