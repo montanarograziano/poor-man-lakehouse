@@ -58,6 +58,10 @@ cp .env.example .env
 
 # Edit .env to set your preferred catalog
 # CATALOG="nessie"      # Options: nessie, lakekeeper, postgres, unity_catalog
+
+# Add Docker service names to /etc/hosts for local Python development
+# This allows the same .env to work both inside Docker and locally
+echo "127.0.0.1 minio postgres_db" | sudo tee -a /etc/hosts
 ```
 
 ### 3. Start Services
@@ -284,17 +288,16 @@ just logs
 just up-clean nessie
 ```
 
-### Spark can't connect to MinIO
+### Spark/Python can't connect to MinIO
 
-Ensure `AWS_ENDPOINT_URL` uses `minio:9000` (Docker network) not `localhost:9000`:
+The `.env` uses Docker service names (`minio`, `postgres_db`). For local Python development, add them to your hosts file:
 
 ```bash
-# In .env for Docker services
-AWS_ENDPOINT_URL="http://minio:9000"
-
-# For local Python (outside Docker)
-AWS_ENDPOINT_URL="http://localhost:9000"
+# Add Docker service names to /etc/hosts
+echo "127.0.0.1 minio postgres_db" | sudo tee -a /etc/hosts
 ```
+
+This allows the same `.env` configuration to work both inside Docker containers and for local development.
 
 ### Catalog not found
 

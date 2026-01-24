@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     # AWS Path
     BUCKET_NAME: str = "warehouse"
-    WAREHOUSE_BUCKET: str = "s3a://warehouse/"
+    WAREHOUSE_BUCKET: str = "s3://warehouse/"
 
     def _configure_data_path(self):
         """Configure S3 storage options."""
