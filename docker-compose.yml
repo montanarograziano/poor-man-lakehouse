@@ -1,9 +1,26 @@
+# Poor Man Lakehouse - Docker Compose
+#
+# Usage:
+#   docker compose up                           # Core only (minio + postgres)
+#   docker compose --profile nessie up          # Core + Nessie catalog
+#   docker compose --profile lakekeeper up      # Core + Lakekeeper catalog
+#   docker compose --profile dremio up          # Core + Nessie + Dremio
+#   docker compose --profile spark up           # Core + Spark cluster
+#   docker compose --profile full up            # Everything
+#
+# Combine profiles:
+#   docker compose --profile nessie --profile spark up
+
 services:
+  # =============================================================================
+  # CORE SERVICES (always run)
+  # =============================================================================
+
   minio:
     image: minio/minio
     ports:
       - "9000:9000"
-      - "9001:9001" # Minio Console port
+      - "9001:9001"
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
@@ -24,7 +41,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set minio ${AWS_ENDPOINT_URL} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
+      /usr/bin/mc alias set minio ${AWS_ENDPOINT_URL:-http://minio:9000} ${AWS_ACCESS_KEY_ID:-minioadmin} ${AWS_SECRET_ACCESS_KEY:-miniopassword} &&
       /usr/bin/mc ls minio/warehouse || /usr/bin/mc mb minio/warehouse
       "
     environment:
@@ -36,7 +53,6 @@ services:
     image: postgres:17.5
     ports:
       - "5432:5432"
-
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-catalog_db}
@@ -50,249 +66,259 @@ services:
       timeout: 5s
       retries: 5
 
-  # unity_catalog_server:
-  #   image: unitycatalog/unitycatalog:latest
-  #   ports:
-  #     - "8080:8080"
-  #   volumes:
-  #     - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf # Custom Unity Catalog config
-  #     - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data # Custom Unity Catalog data
-  #   depends_on:
-  #     postgres_db:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
+  # =============================================================================
+  # NESSIE CATALOG (profile: nessie, dremio, full)
+  # =============================================================================
 
-  # nessie:
-  #   image: ghcr.io/projectnessie/nessie:latest
-  #   container_name: nessie
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #     minio-init-bucket:
-  #       condition: service_completed_successfully
-  #     postgres_db:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #   ports:
-  #     - 19120:19120
+  nessie:
+    profiles: ["nessie", "dremio", "full"]
+    image: ghcr.io/projectnessie/nessie:latest
+    container_name: nessie
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-init-bucket:
+        condition: service_completed_successfully
+      postgres_db:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "19120:19120"
+    healthcheck:
+      test: "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /q/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"
+      interval: 5s
+      timeout: 2s
+      retries: 15
+    environment:
+      - nessie.catalog.default-warehouse=warehouse
+      - nessie.catalog.warehouses.warehouse.location=s3://warehouse
+      - nessie.version.store.type=JDBC2
+      - nessie.version.store.persist.jdbc.datasource=postgresql
+      - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://postgres_db:5432/${POSTGRES_DB:-catalog_db}
+      - quarkus.datasource.postgresql.username=${POSTGRES_USER:-user}
+      - quarkus.datasource.postgresql.password=${POSTGRES_PASSWORD:-password}
+      - nessie.catalog.service.s3.default-options.region=${AWS_DEFAULT_REGION:-eu-central-1}
+      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
+      - my-secrets-default.name=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+    volumes:
+      - ./configs/nessie/data:/var/lib/nessie/data
 
-  #   healthcheck:
-  #     test: "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /q/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"
-  #     interval: 5s
-  #     timeout: 2s
-  #     retries: 15
-  #   environment:
-  #   # Name of the default warehouse
-  #     - nessie.catalog.default-warehouse=warehouse
-  #   # The base location of the warehouse named "warehouse"
-  #     - nessie.catalog.warehouses.warehouse.location=s3://warehouse
-  #   # JDBC URL for Postgres
-  #     - nessie.version.store.type=JDBC2
-  #     - nessie.version.store.persist.jdbc.datasource=postgresql
-  #     - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://postgres_db:5432/${POSTGRES_DB:-catalog_db}
-  #     - quarkus.datasource.postgresql.username=${POSTGRES_USER:-user}
-  #     - quarkus.datasource.postgresql.password=${POSTGRES_PASSWORD:-password}
-  #   # S3 as object storage
-  #   # Default/global S3 configuration settings
-  #     - nessie.catalog.service.s3.default-options.region=${AWS_DEFAULT_REGION:-eu-central-1}
-  #     - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:my-secrets-default
-  #     - my-secrets-default.name=${AWS_ACCESS_KEY_ID:-minioadmin}
-  #     - my-secrets-default.secret=${AWS_SECRET_ACCESS_KEY:-miniopassword}
-  #   # For non-AWS S3 you need to specify the endpoint and possibly enable path-style-access
-  #     - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000
-  #     # - nessie.catalog.service.s3.default-options.external-endpoint=http://127.0.0.1:9002/
-  #     - nessie.catalog.service.s3.default-options.path-style-access=true
-  #   volumes:
-  #     - ./configs/nessie/data:/var/lib/nessie/data
+  # =============================================================================
+  # LAKEKEEPER CATALOG (profile: lakekeeper, full)
+  # =============================================================================
 
+  lakekeeper-migrate:
+    profiles: ["lakekeeper", "full"]
+    image: ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
+    pull_policy: always
+    environment:
+      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+    restart: "no"
+    command: ["migrate"]
+    depends_on:
+      postgres_db:
+        condition: service_healthy
 
-  # dremio:
-  #   platform: linux/x86_64
-  #   image: dremio/dremio-oss:latest
-  #   ports:
-  #     - 9047:9047
-  #     - 31010:31010
-  #     - 32010:32010
-  #   container_name: dremio
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9047"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
-  #   environment:
-  #     DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-  #     DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-  #     DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
-  #   volumes:
-  #     - ./configs/dremio/data:/opt/dremio/data
-  #     - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
-  #     - ./configs/dremio/logs:/opt/dremio/logs
-  #     - ./configs/dremio/local:/localFiles
-  #     - ./configs/dremio/plugins:/opt/dremio/plugins
+  lakekeeper:
+    profiles: ["lakekeeper", "full"]
+    image: ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
+    pull_policy: always
+    environment:
+      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
+    command: ["serve"]
+    healthcheck:
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
+      interval: 1s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+    depends_on:
+      lakekeeper-migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      postgres_db:
+        condition: service_healthy
+      minio-init-bucket:
+        condition: service_completed_successfully
+    ports:
+      - "8181:8181"
 
-  # dremio-init-catalog:
-  #   image: alpine/curl:latest
-  #   container_name: dremio-init-catalog
-  #   depends_on:
-  #     dremio:
-  #       condition: service_healthy
-  #     nessie:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
-  #   env_file:  .env
-  #   environment:
-  #     DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-  #     DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-  #     DREMIO_USERNAME: "${DREMIO_USERNAME:-dremio}"
-  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-  #     AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
-  #     NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
-  #   volumes:
-  #     - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
-  #   entrypoint: /usr/local/bin/init_dremio.sh
+  lakekeeper-bootstrap:
+    profiles: ["lakekeeper", "full"]
+    image: curlimages/curl
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - -w
+      - "%{http_code}"
+      - "-X"
+      - "POST"
+      - "-v"
+      - "http://lakekeeper:8181/management/v1/bootstrap"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - '{"accept-terms-of-use": true}'
+      - "-o"
+      - "/dev/null"
 
-  # lakekeeper:
-  #   image: &lakekeeper-image ${LAKEKEEPER__SERVER_IMAGE:-quay.io/lakekeeper/catalog:latest-main}
-  #   pull_policy: &lakekeeper-pull-policy always
-  #   environment:
-  #     - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
-  #     - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-  #     - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-  #   command: [ "serve" ]
-  #   healthcheck:
-  #     test: [ "CMD", "/home/nonroot/lakekeeper", "healthcheck" ]
-  #     interval: 1s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 3s
-  #   depends_on:
-  #     migrate:
-  #       condition: service_completed_successfully
-  #     minio:
-  #       condition: service_healthy
-  #     postgres_db:
-  #       condition: service_healthy
-  #     minio-init-bucket:
-  #       condition: service_completed_successfully
-  #   ports:
-  #     - "8181:8181"
+  lakekeeper-init-warehouse:
+    profiles: ["lakekeeper", "full"]
+    image: curlimages/curl
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      lakekeeper-bootstrap:
+        condition: service_completed_successfully
+      minio-init-bucket:
+        condition: service_completed_successfully
+    restart: "no"
+    command:
+      - -w
+      - "%{http_code}"
+      - "-X"
+      - "POST"
+      - "-v"
+      - "http://lakekeeper:8181/management/v1/warehouse"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - "@create-default-warehouse.json"
+      - "-o"
+      - "/dev/null"
+    volumes:
+      - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
 
-  # migrate:
-  #   image: *lakekeeper-image
-  #   pull_policy: *lakekeeper-pull-policy
-  #   environment:
-  #     - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
-  #     - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-  #     - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres_db:5432/${POSTGRES_DB:-catalog_db}
-  #   restart: "no"
-  #   command: [ "migrate" ]
-  #   depends_on:
-  #     postgres_db:
-  #       condition: service_healthy
+  # =============================================================================
+  # DREMIO (profile: dremio, full) - requires nessie
+  # =============================================================================
 
-  # bootstrap:
-  #   image: curlimages/curl
-  #   depends_on:
-  #     lakekeeper:
-  #       condition: service_healthy
-  #   restart: "no"
-  #   command:
-  #     - -w
-  #     - "%{http_code}"
-  #     - "-X"
-  #     - "POST"
-  #     - "-v"
-  #     - "http://lakekeeper:8181/management/v1/bootstrap"
-  #     - "-H"
-  #     - "Content-Type: application/json"
-  #     - "--data"
-  #     - '{"accept-terms-of-use": true}'
-  #     - "-o"
-  #     - "/dev/null"
-  #     # - "--fail-with-body"
+  dremio:
+    profiles: ["dremio", "full"]
+    platform: linux/x86_64
+    image: dremio/dremio-oss:latest
+    ports:
+      - "9047:9047"
+      - "31010:31010"
+      - "32010:32010"
+    container_name: dremio
+    depends_on:
+      minio:
+        condition: service_healthy
+      nessie:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9047"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    environment:
+      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+      DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
+    volumes:
+      - ./configs/dremio/data:/opt/dremio/data
+      - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
+      - ./configs/dremio/logs:/opt/dremio/logs
+      - ./configs/dremio/local:/localFiles
+      - ./configs/dremio/plugins:/opt/dremio/plugins
 
-  # initialwarehouse:
-  #   image: curlimages/curl
-  #   depends_on:
-  #     lakekeeper:
-  #       condition: service_healthy
-  #     bootstrap:
-  #       condition: service_completed_successfully
-  #     minio-init-bucket:
-  #       condition: service_completed_successfully
-  #   restart: "no"
-  #   command:
-  #     - -w
-  #     - "%{http_code}"
-  #     - "-X"
-  #     - "POST"
-  #     - "-v"
-  #     - "http://lakekeeper:8181/management/v1/warehouse"
-  #     - "-H"
-  #     - "Content-Type: application/json"
-  #     - "--data"
-  #     - "@create-default-warehouse.json"
-  #     - "-o"
-  #     - "/dev/null"
-  #     # - "--fail-with-body"
-  #   volumes:
-  #     - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
+  dremio-init-catalog:
+    profiles: ["dremio", "full"]
+    image: alpine/curl:latest
+    container_name: dremio-init-catalog
+    depends_on:
+      dremio:
+        condition: service_healthy
+      nessie:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+      DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
+      NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
+    volumes:
+      - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
+    entrypoint: /usr/local/bin/init_dremio.sh
 
-  # spark-master:
-  #   image: bitnami/spark:4.0.0
-  #   command: bin/spark-class org.apache.spark.deploy.master.Master
-  #   hostname: spark-master
-  #   ports:
-  #     - "8081:8080" # Spark Master UI
-  #     - "7077:7077" # Spark Master internal communication
-  #     - "10000:10000" # Spark Connect
-  #   environment:
-  #     SPARK_MASTER_HOST: spark-master
-  #     SPARK_MASTER_PORT: 7077
-  #     SPARK_DRIVER_PORT: 7001
-  #     SPARK_BLOCKMGR_PORT: 7002
-  #     SPARK_WORKER_PORT: 7003
-  #     # Minio credentials for Spark to access S3-compatible storage
-  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniopassword}
-  #     AWS_ENDPOINT_URL: http://minio:9000
-  #     # Spark configs for Minio (S3A) and Unity Catalog
-  #     SPARK_CONF_DIR: /opt/spark/conf
-  #   volumes:
-  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
-  #   # depends_on:
-  #   #   minio:
-  #   #     condition: service_healthy
-  #   # healthcheck:
-  #   #   # Check if the Spark Master UI is reachable
-  #   #   test: ["CMD", "curl", "-f", "http://localhost:8081"]
-  #   #   interval: 10s
-  #   #   timeout: 5s
-  #   #   retries: 5
-  #   #   start_period: 20s # Give Spark Master time to start its UI
+  # =============================================================================
+  # UNITY CATALOG (profile: unity, full)
+  # =============================================================================
 
-  # spark-worker:
-  #   image: bitnami/spark:4.0.0
-  #   hostname: spark-worker
-  #   command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-  #   environment:
-  #     SPARK_MASTER_HOST: spark-master
-  #     SPARK_MASTER_PORT: 7077
-  #     # Minio credentials for Spark worker
-  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniopassword}
-  #     AWS_ENDPOINT_URL: http://minio:9000
-  #     SPARK_CONF_DIR: /opt/spark/conf
-  #   volumes:
-  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf # Custom Spark config
-  #   # depends_on:
-  #   #   spark-master:
-  #   #     condition: service_healthy
+  unity_catalog:
+    profiles: ["unity", "full"]
+    image: unitycatalog/unitycatalog:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf
+      - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # =============================================================================
+  # SPARK CLUSTER (profile: spark, full)
+  # =============================================================================
+
+  spark-master:
+    profiles: ["spark", "full"]
+    image: bitnami/spark:4.0.0
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    hostname: spark-master
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+      - "10000:10000"
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
+      SPARK_DRIVER_PORT: 7001
+      SPARK_BLOCKMGR_PORT: 7002
+      SPARK_WORKER_PORT: 7003
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT_URL: http://minio:9000
+      SPARK_CONF_DIR: /opt/spark/conf
+    volumes:
+      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  spark-worker:
+    profiles: ["spark", "full"]
+    image: bitnami/spark:4.0.0
+    hostname: spark-worker
+    command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT_URL: http://minio:9000
+      SPARK_CONF_DIR: /opt/spark/conf
+    volumes:
+      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    depends_on:
+      - spark-master
