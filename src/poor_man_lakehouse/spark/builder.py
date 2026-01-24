@@ -110,9 +110,7 @@ class SparkBuilder(ABC):
         builder = builder.config("spark.sql.extensions", extensions)
         # DeltaCatalog on spark_catalog enables path-based Delta operations
         # This is separate from the named Iceberg catalog and they coexist
-        builder = builder.config(
-            "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
-        )
+        builder = builder.config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         return self._configure_s3(builder)
 
     @abstractmethod
@@ -195,9 +193,8 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
 
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
         catalog = self.catalog_name
-        return (
-            builder.config("spark.sql.defaultCatalog", catalog)
-            .config(f"spark.sql.catalog.{catalog}.renewCredential.enabled", "true")
+        return builder.config("spark.sql.defaultCatalog", catalog).config(
+            f"spark.sql.catalog.{catalog}.renewCredential.enabled", "true"
         )
 
     def get_spark_session(self) -> SparkSession:
@@ -240,18 +237,29 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
     """Builder for Spark session with Lakekeeper catalog.
 
     Uses Lakekeeper's REST catalog interface for Iceberg tables.
+    Based on official Lakekeeper Spark documentation:
+    https://docs.lakekeeper.io/docs/nightly/engines/#spark
     """
+
+    @property
+    def catalog_name(self) -> str:
+        """Return the catalog name for this builder.
+
+        Lakekeeper uses 'lakekeeper' as the catalog name regardless of settings.
+        """
+        return "lakekeeper"
 
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
         catalog = self.catalog_name
+        # Lakekeeper REST catalog URI
+        lakekeeper_catalog_uri = f"{settings.LAKEKEEPER_SERVER_URI}/catalog"
 
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
             .config(f"spark.sql.catalog.{catalog}.type", "rest")
-            .config(f"spark.sql.catalog.{catalog}.uri", settings.LAKEKEEPER_SERVER_URI)
+            .config(f"spark.sql.catalog.{catalog}.uri", lakekeeper_catalog_uri)
             .config(f"spark.sql.catalog.{catalog}.warehouse", settings.WAREHOUSE_BUCKET)
             .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-            .config(f"spark.sql.catalog.{catalog}.s3.endpoint", settings.AWS_ENDPOINT_URL)
             .config("spark.sql.defaultCatalog", catalog)
         )
 
