@@ -65,19 +65,24 @@ if [ $? -eq 0 ]; then
 else
     echo "Nessie catalog 'nessie' not found. Creating..."
 
-    # Create a temporary file with the JSON payload to avoid shell escaping issues
+    # Create a temporary file with the JSON payload
+    # Uses environment variables for credentials (note: EOF without quotes enables variable substitution)
     TEMP_PAYLOAD=$(mktemp)
-    cat > "$TEMP_PAYLOAD" << 'EOF'
+
+    # Extract host:port from AWS_ENDPOINT_URL (remove http:// or https://)
+    S3_ENDPOINT=$(echo "${AWS_ENDPOINT_URL}" | sed 's|^https\?://||')
+
+    cat > "$TEMP_PAYLOAD" << EOF
 {
     "name": "nessie",
     "config": {
-        "nessieEndpoint": "http://nessie:19120/api/v2",
+        "nessieEndpoint": "${NESSIE_DREMIO_SERVER_URI}",
         "nessieAuthType": "NONE",
         "storageProvider": "AWS",
-        "awsRootPath": "warehouse",
+        "awsRootPath": "${BUCKET_NAME}",
         "credentialType": "ACCESS_KEY",
-        "awsAccessKey": "minioadmin",
-        "awsAccessSecret": "miniopassword",
+        "awsAccessKey": "${AWS_ACCESS_KEY_ID}",
+        "awsAccessSecret": "${AWS_SECRET_ACCESS_KEY}",
         "azureAuthenticationType": "ACCESS_KEY",
         "googleAuthenticationType": "SERVICE_ACCOUNT_KEYS",
         "propertyList": [
@@ -87,7 +92,7 @@ else
             },
             {
                 "name": "fs.s3a.endpoint",
-                "value": "minio:9000"
+                "value": "${S3_ENDPOINT}"
             },
             {
                 "name": "dremio.s3.compat",

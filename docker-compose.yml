@@ -174,7 +174,7 @@ services:
 
   lakekeeper-init-warehouse:
     profiles: ["lakekeeper", "full"]
-    image: curlimages/curl
+    image: alpine/curl:latest
     depends_on:
       lakekeeper:
         condition: service_healthy
@@ -183,21 +183,16 @@ services:
       minio-init-bucket:
         condition: service_completed_successfully
     restart: "no"
-    command:
-      - -w
-      - "%{http_code}"
-      - "-X"
-      - "POST"
-      - "-v"
-      - "http://lakekeeper:8181/management/v1/warehouse"
-      - "-H"
-      - "Content-Type: application/json"
-      - "--data"
-      - "@create-default-warehouse.json"
-      - "-o"
-      - "/dev/null"
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT_URL: http://minio:9000
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-central-1}
+      BUCKET_NAME: ${BUCKET_NAME:-warehouse}
+      LAKEKEEPER_SERVER_URI: http://lakekeeper:8181
     volumes:
-      - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
+      - ./scripts/init_lakekeeper_warehouse.sh:/usr/local/bin/init_lakekeeper_warehouse.sh
+    entrypoint: /usr/local/bin/init_lakekeeper_warehouse.sh
 
   # =============================================================================
   # DREMIO (profile: dremio, full) - requires nessie
