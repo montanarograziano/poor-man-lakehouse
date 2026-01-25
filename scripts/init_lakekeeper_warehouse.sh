@@ -33,7 +33,7 @@ PAYLOAD=$(cat <<EOF
     "bucket": "${BUCKET_NAME}",
     "endpoint": "${AWS_ENDPOINT_URL}",
     "flavor": "minio",
-    "key-prefix": "initial-warehouse",
+    "key-prefix": "lakekeeper",
     "path-style-access": true,
     "region": "${AWS_DEFAULT_REGION}",
     "sts-enabled": true,
