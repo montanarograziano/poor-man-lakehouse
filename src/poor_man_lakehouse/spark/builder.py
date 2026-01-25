@@ -26,6 +26,7 @@ COMMON_PACKAGES: list[str] = [
     "org.apache.iceberg:iceberg-aws-bundle:1.10.1",
     "org.apache.hadoop:hadoop-aws:3.4.1",
     "org.postgresql:postgresql:42.7.3",
+    f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.106.0",
 ]
 
 
@@ -46,7 +47,9 @@ class SparkBuilder(ABC):
     """
 
     # SQL extensions for Iceberg and Delta support
-    ICEBERG_EXTENSIONS: ClassVar[str] = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    ICEBERG_EXTENSIONS: ClassVar[str] = (
+        "org.projectnessie.spark.extensions.NessieSparkSessionExtensions,org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    )
     DELTA_EXTENSIONS: ClassVar[str] = "io.delta.sql.DeltaSparkSessionExtension"
 
     @property
@@ -216,12 +219,13 @@ class NessieCatalogSparkBuilder(SparkBuilder):
 
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
-            .config(f"spark.sql.catalog.{catalog}.type", "rest")
-            .config(f"spark.sql.catalog.{catalog}.uri", settings.NESSIE_PYICEBERG_SERVER_URI)
+            .config(f"spark.sql.catalog.{catalog}.catalog-impl", "org.apache.iceberg.nessie.NessieCatalog")
+            .config(f"spark.sql.catalog.{catalog}.uri", settings.NESSIE_NATIVE_URI)
             .config(f"spark.sql.catalog.{catalog}.ref", "main")
             .config(f"spark.sql.catalog.{catalog}.authentication.type", "NONE")
             .config(f"spark.sql.catalog.{catalog}.warehouse", settings.WAREHOUSE_BUCKET)
             .config(f"spark.sql.catalog.{catalog}.s3.endpoint", settings.AWS_ENDPOINT_URL)
+            .config(f"spark.sql.catalog.{catalog}.s3.path-style-access", "true")
             .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
             .config("spark.sql.defaultCatalog", catalog)
         )
