@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     # LakeKeeper Configuration
     LAKEKEEPER_SERVER_URI: str = "http://lakekeeper:8181"
 
+    # Unity Catalog Configuration
+    UNITY_CATALOG_URI: str = "http://unity_catalog:8080/"
+
     # Dremio settings
     DREMIO_SERVER_URI: str = "http://dremio:9047"
     ARROW_ENDPOINT: str = "grpc://dremio:32010"

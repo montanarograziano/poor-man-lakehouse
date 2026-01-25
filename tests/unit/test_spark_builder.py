@@ -129,12 +129,14 @@ class TestNessieCatalogSparkBuilder:
     """Tests for NessieCatalogSparkBuilder."""
 
     @patch("poor_man_lakehouse.spark.builder.settings")
-    def test_configure_catalog_sets_rest_config(self, mock_settings):
-        """Test _configure_catalog sets REST catalog configuration."""
+    def test_configure_catalog_sets_nessie_config(self, mock_settings):
+        """Test _configure_catalog sets Nessie catalog configuration."""
         mock_settings.CATALOG_NAME = "nessie"
-        mock_settings.NESSIE_PYICEBERG_SERVER_URI = "http://nessie:19120/iceberg"
+        mock_settings.NESSIE_NATIVE_URI = "http://nessie:19120/api/v2"
         mock_settings.WAREHOUSE_BUCKET = "s3a://warehouse/"
         mock_settings.AWS_ENDPOINT_URL = "http://minio:9000"
+        mock_settings.AWS_ACCESS_KEY_ID = "minioadmin"
+        mock_settings.AWS_SECRET_ACCESS_KEY = "miniopassword"  # noqa: S105
 
         builder = NessieCatalogSparkBuilder()
         mock_builder = MagicMock()
@@ -142,9 +144,9 @@ class TestNessieCatalogSparkBuilder:
 
         builder._configure_catalog(mock_builder)
 
-        # Verify REST catalog config was set
+        # Verify Nessie catalog config was set (uses NessieCatalog, not REST)
         config_calls = [str(call) for call in mock_builder.config.call_args_list]
-        assert any("rest" in str(call) for call in config_calls)
+        assert any("NessieCatalog" in str(call) for call in config_calls)
         assert any("nessie" in str(call) for call in config_calls)
 
 
