@@ -76,7 +76,7 @@ services:
 
   nessie:
     profiles: ["nessie", "dremio", "full"]
-    image: ghcr.io/projectnessie/nessie:latest
+    image: ghcr.io/projectnessie/nessie:0.106.1-java
     container_name: nessie
     depends_on:
       minio:
