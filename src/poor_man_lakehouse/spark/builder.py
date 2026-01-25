@@ -220,6 +220,7 @@ class NessieCatalogSparkBuilder(SparkBuilder):
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
             .config(f"spark.sql.catalog.{catalog}.catalog-impl", "org.apache.iceberg.nessie.NessieCatalog")
+            .config(f"spark.sql.catalog.{catalog}.client-api-version", "2")
             .config(f"spark.sql.catalog.{catalog}.uri", settings.NESSIE_NATIVE_URI)
             .config(f"spark.sql.catalog.{catalog}.ref", "main")
             .config(f"spark.sql.catalog.{catalog}.authentication.type", "NONE")
