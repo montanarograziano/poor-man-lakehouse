@@ -98,7 +98,7 @@ class IbisConnection:
         """Get the appropriate catalog URI based on settings."""
         catalog_type = settings.CATALOG.lower()
         if catalog_type == "nessie":
-            return settings.NESSIE_PYICEBERG_SERVER_URI
+            return settings.NESSIE_REST_URI
         if catalog_type == "lakekeeper":
             return settings.LAKEKEEPER_SERVER_URI
         return settings.CATALOG_URI

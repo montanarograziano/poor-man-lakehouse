@@ -62,9 +62,8 @@ class Settings(BaseSettings):
     CATALOG_DEFAULT_SCHEMA: str = "default"
 
     # Nessie Configuration
-    NESSIE_SPARK_SERVER_URI: str = "http://nessie:19120/api/v1"
-    NESSIE_DREMIO_SERVER_URI: str = "http://nessie:19120/api/v2"
-    NESSIE_PYICEBERG_SERVER_URI: str = "http://nessie:19120/iceberg"
+    NESSIE_NATIVE_URI: str = "http://nessie:19120/api/v2"
+    NESSIE_REST_URI: str = "http://nessie:19120/iceberg"
 
     # LakeKeeper Configuration
     LAKEKEEPER_SERVER_URI: str = "http://lakekeeper:8181"
