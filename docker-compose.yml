@@ -264,7 +264,7 @@ services:
 
   unity_catalog:
     profiles: ["unity", "full"]
-    image: unitycatalog/unitycatalog:main
+    image: unitycatalog/unitycatalog:latest
     ports:
       - "8080:8080"
     environment:
