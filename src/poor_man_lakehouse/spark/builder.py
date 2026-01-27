@@ -24,9 +24,10 @@ SPARK_MAJOR_MINOR = "4.0"
 COMMON_PACKAGES: list[str] = [
     f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_MAJOR_MINOR}_{SCALA_VERSION}:1.10.1",
     "org.apache.iceberg:iceberg-aws-bundle:1.10.1",
-    "org.apache.hadoop:hadoop-aws:3.4.1",
+    "org.apache.hadoop:hadoop-aws:3.4.0",
     "org.postgresql:postgresql:42.7.3",
     f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.106.0",
+    f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.1",
 ]
 
 
@@ -229,12 +230,10 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
             builder.config(f"spark.sql.catalog.{catalog}", "io.unitycatalog.spark.UCSingleCatalog")
             .config(f"spark.sql.catalog.{catalog}.uri", settings.UNITY_CATALOG_URI)
             .config(f"spark.sql.catalog.{catalog}.token", "")
+            .config(f"spark.sql.catalog.{catalog}.renewCredential.enabled", "true")
             # Map s3:// scheme to s3a filesystem implementation
             .config("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            # Override spark_catalog to use UC as well for seamless Delta/Iceberg handling
             .config("spark.sql.catalog.spark_catalog", "io.unitycatalog.spark.UCSingleCatalog")
-            .config("spark.sql.catalog.spark_catalog.uri", settings.UNITY_CATALOG_URI)
-            .config("spark.sql.catalog.spark_catalog.token", "")
             .config("spark.sql.defaultCatalog", catalog)
         )
 
