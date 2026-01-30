@@ -36,7 +36,7 @@ def load_sql_magic(client: PolarsClient | None = None):
 
     # Get the current IPython instance and load the extension
     try:
-        from IPython import get_ipython
+        from IPython import get_ipython # pyright: ignore[reportPrivateImportUsage]
 
         ip = get_ipython()
         if ip is not None:

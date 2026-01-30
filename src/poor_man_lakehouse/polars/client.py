@@ -128,7 +128,7 @@ class PolarsClient:
             DataFrame or LazyFrame depending on the lazy parameter
         """
         parsed = sqlglot.parse_one(query)
-        tables = list(parsed.find_all(sqlglot.exp.Table))
+        tables = list(parsed.find_all(sqlglot.exp.Table))  # pyright: ignore[reportPrivateImportUsage]
 
         if not tables:
             raise ValueError("No tables found in query")
@@ -150,7 +150,7 @@ class PolarsClient:
             # Replace the table reference in the parsed query
             table.set("catalog", None)
             table.set("db", None)
-            table.set("this", sqlglot.exp.Identifier(this=var_name))
+            table.set("this", sqlglot.exp.Identifier(this=var_name))  # pyright: ignore[reportPrivateImportUsage]
 
         # Generate the transformed SQL
         transformed_sql = parsed.sql()
