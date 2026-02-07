@@ -66,7 +66,8 @@ class Settings(BaseSettings):
     NESSIE_REST_URI: str = "http://nessie:19120/iceberg"
 
     # LakeKeeper Configuration
-    LAKEKEEPER_SERVER_URI: str = "http://lakekeeper:8181"
+    LAKEKEEPER_SERVER_URI: str = "http://lakekeeper:8181/catalog"
+    LAKEKEEPER_WAREHOUSE: str = "warehouse"
 
     # Unity Catalog Configuration
     UNITY_CATALOG_URI: str = "http://unity_catalog:8080/"
@@ -103,7 +104,9 @@ class Settings(BaseSettings):
             "s3.access-key-id": self.AWS_ACCESS_KEY_ID,
             "s3.secret-access-key": self.AWS_SECRET_ACCESS_KEY,
             "s3.region": self.AWS_DEFAULT_REGION,
-            "warehouse": self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
+            "warehouse": self.LAKEKEEPER_WAREHOUSE
+            if self.CATALOG == "lakekeeper"
+            else self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
         }
 
     def _setup_logger(self) -> None:

@@ -296,13 +296,13 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
         catalog = self.catalog_name
         # Lakekeeper REST catalog URI
-        lakekeeper_catalog_uri = f"{settings.LAKEKEEPER_SERVER_URI}/catalog"
+        lakekeeper_catalog_uri = f"{settings.LAKEKEEPER_SERVER_URI}"
 
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
             .config(f"spark.sql.catalog.{catalog}.type", "rest")
             .config(f"spark.sql.catalog.{catalog}.uri", lakekeeper_catalog_uri)
-            .config(f"spark.sql.catalog.{catalog}.warehouse", settings.BUCKET_NAME)
+            .config(f"spark.sql.catalog.{catalog}.warehouse", settings.LAKEKEEPER_WAREHOUSE)
             .config(f"spark.sql.catalog.{catalog}.s3.path-style-access", "true")
             .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
             .config("spark.sql.defaultCatalog", catalog)

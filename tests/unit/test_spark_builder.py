@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from poor_man_lakehouse.spark.builder import (
+from poor_man_lakehouse.spark_connector.builder import (
     COMMON_PACKAGES,
     CatalogType,
     DeltaUnityCatalogSparkBuilder,
@@ -91,7 +91,7 @@ class TestSparkBuilderBase:
         # Should be a copy, not the same list
         assert packages is not COMMON_PACKAGES
 
-    @patch("poor_man_lakehouse.spark.builder.settings")
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
     def test_catalog_name_property(self, mock_settings):
         """Test catalog_name property returns settings.CATALOG_NAME."""
         mock_settings.CATALOG_NAME = "test-catalog"
@@ -102,8 +102,8 @@ class TestSparkBuilderBase:
 class TestPostgresCatalogSparkBuilder:
     """Tests for PostgresCatalogSparkBuilder."""
 
-    @patch("poor_man_lakehouse.spark.builder.settings")
-    @patch("poor_man_lakehouse.spark.builder.SparkSession")
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
+    @patch("poor_man_lakehouse.spark_connector.builder.SparkSession")
     def test_configure_catalog_sets_jdbc_config(self, _mock_spark, mock_settings):
         """Test _configure_catalog sets JDBC configuration."""
         mock_settings.CATALOG_NAME = "postgres_catalog"
@@ -128,7 +128,7 @@ class TestPostgresCatalogSparkBuilder:
 class TestNessieCatalogSparkBuilder:
     """Tests for NessieCatalogSparkBuilder."""
 
-    @patch("poor_man_lakehouse.spark.builder.settings")
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
     def test_configure_catalog_sets_nessie_config(self, mock_settings):
         """Test _configure_catalog sets Nessie catalog configuration."""
         mock_settings.CATALOG_NAME = "nessie"
@@ -153,7 +153,7 @@ class TestNessieCatalogSparkBuilder:
 class TestLakekeeperCatalogSparkBuilder:
     """Tests for LakekeeperCatalogSparkBuilder."""
 
-    @patch("poor_man_lakehouse.spark.builder.settings")
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
     def test_configure_catalog_uses_lakekeeper_uri(self, mock_settings):
         """Test _configure_catalog uses Lakekeeper server URI."""
         mock_settings.CATALOG_NAME = "lakekeeper"
