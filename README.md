@@ -157,10 +157,33 @@ Ensure your `.env` `CATALOG` setting matches the Docker profile you're using:
 
 ## Usage
 
-### Using the Ibis Connection (Recommended)
+All connectors are available as top-level imports:
 
 ```python
-from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+from poor_man_lakehouse import (
+    IbisConnection,
+    DremioConnection,
+    PolarsClient,
+    CatalogType,
+    get_spark_builder,
+    retrieve_current_spark_session,
+    settings,
+)
+```
+
+Or import from subpackages directly:
+
+```python
+from poor_man_lakehouse.ibis_connector import IbisConnection
+from poor_man_lakehouse.dremio_connector import DremioConnection
+from poor_man_lakehouse.polars_connector import PolarsClient, load_sql_magic
+from poor_man_lakehouse.spark_connector import CatalogType, get_spark_builder
+```
+
+### Using the Ibis Connection (Requires Lakekeeper)
+
+```python
+from poor_man_lakehouse import IbisConnection
 
 # Connections are lazily initialized
 conn = IbisConnection()
@@ -176,13 +199,34 @@ polars_conn = conn.get_connection("polars")
 duck_conn = conn.get_connection("duckdb")
 
 # Read Iceberg tables
-df = conn.read_table("default", "my_table", engine="polars")
+df = conn.read_table("default", "my_table", "polars")
+
+# Execute SQL (PySpark and DuckDB only)
+result = conn.sql("SELECT * FROM default.my_table", "duckdb")
+```
+
+### Using the Polars Client (Requires Unity Catalog)
+
+```python
+from poor_man_lakehouse import PolarsClient
+
+client = PolarsClient()
+
+# Explore the catalog
+print(client.list_catalogs())
+print(client.list_tables("unity", "default"))
+
+# Run SQL queries
+df = client.sql("SELECT * FROM unity.default.test_table WHERE id > 10")
+
+# Lazy evaluation
+lazy_df = client.sql("SELECT * FROM unity.default.test_table", lazy=True)
 ```
 
 ### Using Spark Builders Directly
 
 ```python
-from poor_man_lakehouse.spark.builder import get_spark_builder, CatalogType
+from poor_man_lakehouse import get_spark_builder, CatalogType
 
 # Get builder for your configured catalog
 builder = get_spark_builder(CatalogType.NESSIE)
@@ -195,12 +239,16 @@ df = spark.sql("SELECT * FROM nessie.default.my_table")
 ### Using Dremio for Query Federation
 
 ```python
-from poor_man_lakehouse.dremio_connector.builder import DremioConnection
+from poor_man_lakehouse import DremioConnection
 
 conn = DremioConnection()
 
-# Query via Arrow Flight
+# Query via Arrow Flight — returns Polars DataFrame
 result = conn.to_polars("SELECT * FROM nessie.default.my_table")
+
+# Or as DuckDB relation / Pandas DataFrame
+duck_rel = conn.to_duckdb("SELECT * FROM nessie.default.my_table")
+pandas_df = conn.to_pandas("SELECT * FROM nessie.default.my_table")
 ```
 
 ## Project Structure
@@ -209,11 +257,14 @@ result = conn.to_polars("SELECT * FROM nessie.default.my_table")
 poor-man-lakehouse/
 ├── src/poor_man_lakehouse/
 │   ├── config.py           # Settings management (Pydantic)
-│   ├── spark/
+│   ├── spark_connector/
 │   │   └── builder.py      # Spark session builders for each catalog
-│   ├── ibis/
+│   ├── ibis_connector/
 │   │   └── builder.py      # Multi-engine Ibis connection
-│   └── dremio/
+│   ├── polars_connector/
+│   │   ├── client.py       # Polars client for Unity Catalog
+│   │   └── magic.py        # Jupyter %%sql cell magic
+│   └── dremio_connector/
 │       └── builder.py      # Dremio Arrow Flight connection
 ├── notebooks/              # Example notebooks
 │   ├── pyspark_experiments.ipynb

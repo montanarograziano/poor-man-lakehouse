@@ -11,8 +11,10 @@ All engines connect to the Lakekeeper REST catalog for Iceberg table management.
 Connections are lazily initialized - engines are only started when first accessed.
 """
 
+from __future__ import annotations
+
 from functools import cached_property
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal, overload
 
 import ibis
 import polars as pl
@@ -21,6 +23,11 @@ from loguru import logger
 from pyiceberg.catalog import Catalog, load_catalog
 
 from poor_man_lakehouse.config import settings
+
+if TYPE_CHECKING:
+    from ibis.backends.duckdb import Backend as DuckDBBackend
+    from ibis.backends.polars import Backend as PolarsBackend
+    from ibis.backends.pyspark import Backend as PySparkBackend
 
 Engine = Literal["pyspark", "polars", "duckdb"]
 SQLEngine = Literal["pyspark", "duckdb"]
@@ -70,20 +77,20 @@ class IbisConnection:
                 f"Got: '{settings.CATALOG}'. Set CATALOG=lakekeeper in your environment."
             )
         self._catalog_name = settings.CATALOG_NAME
-        self._lakekeeper_endpoint = f"{settings.LAKEKEEPER_SERVER_URI}/catalog"
+        self._lakekeeper_endpoint = f"{settings.LAKEKEEPER_SERVER_URI}"
         logger.debug(f"IbisConnection initialized with Lakekeeper catalog at {self._lakekeeper_endpoint}")
 
     @cached_property
-    def _pyspark_connection(self) -> Any:
+    def _pyspark_connection(self) -> PySparkBackend:
         """Lazily initialize PySpark Ibis connection with Lakekeeper catalog."""
         # Import here to avoid circular imports and delay Spark startup
-        from poor_man_lakehouse.spark.builder import retrieve_current_spark_session
+        from poor_man_lakehouse.spark_connector.builder import retrieve_current_spark_session
 
         logger.info("Initializing PySpark connection with Lakekeeper catalog...")
         return ibis.pyspark.connect(session=retrieve_current_spark_session())
 
     @cached_property
-    def _polars_connection(self) -> Any:
+    def _polars_connection(self) -> PolarsBackend:
         """Lazily initialize Polars Ibis connection.
 
         Polars doesn't support Lakekeeper natively, so tables are loaded
@@ -93,7 +100,7 @@ class IbisConnection:
         return ibis.polars.connect()
 
     @cached_property
-    def _duckdb_connection(self) -> Any:
+    def _duckdb_connection(self) -> DuckDBBackend:
         """Lazily initialize DuckDB Ibis connection with Lakekeeper catalog attached.
 
         Configures S3/MinIO access and attaches the Lakekeeper REST catalog
@@ -140,7 +147,14 @@ class IbisConnection:
         logger.debug(f"Initializing PyIceberg catalog '{self._catalog_name}' at {settings.LAKEKEEPER_SERVER_URI}")
         return load_catalog(self._catalog_name, **catalog_config)
 
-    def get_connection(self, engine: Engine) -> Any:
+    @overload
+    def get_connection(self, engine: Literal["pyspark"]) -> PySparkBackend: ...
+    @overload
+    def get_connection(self, engine: Literal["polars"]) -> PolarsBackend: ...
+    @overload
+    def get_connection(self, engine: Literal["duckdb"]) -> DuckDBBackend: ...
+
+    def get_connection(self, engine: Engine) -> DuckDBBackend | PolarsBackend | PySparkBackend:
         """Get the Ibis connection for the specified engine.
 
         Connections are lazily initialized on first access.
@@ -154,9 +168,6 @@ class IbisConnection:
         Raises:
             ValueError: If the engine is not supported.
         """
-        if engine not in _SUPPORTED_ENGINES:
-            raise ValueError(f"Unsupported engine: {engine}. Supported: {_SUPPORTED_ENGINES}")
-
         if engine == "pyspark":
             return self._pyspark_connection
         if engine == "polars":
@@ -164,8 +175,7 @@ class IbisConnection:
         if engine == "duckdb":
             return self._duckdb_connection
 
-        # Should never reach here due to validation above
-        raise ValueError(f"Unsupported engine: {engine}")
+        raise ValueError(f"Unsupported engine: {engine}. Supported: {_SUPPORTED_ENGINES}")
 
     def list_tables(self, engine: Engine) -> list[str]:
         """List all tables available in the specified engine.
@@ -193,11 +203,10 @@ class IbisConnection:
         if engine not in _SQL_ENGINES:
             raise ValueError(f"Engine '{engine}' does not support database switching")
 
-        con = self.get_connection(engine)
         if engine == "duckdb":
-            con.raw_sql(f"USE {self._catalog_name}.{database};")
+            self._duckdb_connection.raw_sql(f"USE {self._catalog_name}.{database};")
         elif engine == "pyspark":
-            con.catalog.setCurrentDatabase(database)
+            self._pyspark_connection.raw_sql(f"USE {database}")
 
     def sql(self, query: str, engine: SQLEngine) -> Table:
         """Execute SQL queries using the specified engine.
@@ -226,9 +235,9 @@ class IbisConnection:
 
         if engine == "duckdb":
             self.set_current_database("default", engine)
+            return self._duckdb_connection.sql(query)
 
-        con = self.get_connection(engine)
-        return con.sql(query)
+        return self._pyspark_connection.sql(query)
 
     def read_table(
         self,
@@ -254,18 +263,16 @@ class IbisConnection:
         Raises:
             ValueError: If the table cannot be read.
         """
-        con = self.get_connection(engine)
-
         if engine == "pyspark":
             try:
-                return con.table(table_name)
+                return self._pyspark_connection.table(table_name)
             except Exception as e:
                 raise ValueError(f"Could not read table {database}.{table_name} with PySpark: {e}") from e
 
         elif engine == "duckdb":
             try:
                 self.set_current_database(database, engine)
-                return con.sql(f"SELECT * FROM {self._catalog_name}.{database}.{table_name}")  # noqa: S608
+                return self._duckdb_connection.sql(f"SELECT * FROM {self._catalog_name}.{database}.{table_name}")  # noqa: S608
             except Exception as e:
                 raise ValueError(f"Could not read table {database}.{table_name} with DuckDB: {e}") from e
 
@@ -276,9 +283,10 @@ class IbisConnection:
                 lazyframe = pl.scan_iceberg(iceberg_table)
 
                 # Register in Polars Ibis connection
-                con.create_table(f"{database}.{table_name}", lazyframe, overwrite=True)
+                polars_con = self._polars_connection
+                polars_con.create_table(f"{database}.{table_name}", lazyframe, overwrite=True)
 
-                return con.table(f"{database}.{table_name}")
+                return polars_con.table(f"{database}.{table_name}")
 
             except Exception as e:
                 raise ValueError(f"Could not read table {database}.{table_name} with Polars: {e}") from e
