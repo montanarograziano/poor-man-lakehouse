@@ -1,6 +1,6 @@
 """Polars client for Unity Catalog with SQL magic support."""
 
-from poor_man_lakehouse.polars.client import PolarsClient
+from poor_man_lakehouse.polars_connector.client import PolarsClient
 
 __all__ = ["PolarsClient", "load_sql_magic"]
 
@@ -15,7 +15,7 @@ def load_sql_magic(client: PolarsClient | None = None):
         In a Jupyter notebook:
 
         ```python
-        from poor_man_lakehouse.polars import PolarsClient, load_sql_magic
+        from poor_man_lakehouse.polars_connector import PolarsClient, load_sql_magic
 
         client = PolarsClient("http://localhost:8080/")
         load_sql_magic(client)
@@ -29,7 +29,7 @@ def load_sql_magic(client: PolarsClient | None = None):
         WHERE value > 100
         ```
     """
-    from poor_man_lakehouse.polars.magic import load_ipython_extension, set_client
+    from poor_man_lakehouse.polars_connector.magic import load_ipython_extension, set_client
 
     if client is not None:
         set_client(client)
