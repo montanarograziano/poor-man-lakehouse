@@ -98,15 +98,15 @@ The project uses Docker Compose profiles to manage service groups.
 
 > **Important**: Run **one catalog at a time**. Multiple catalogs (Nessie, Lakekeeper, Unity Catalog, PostgreSQL JDBC) share the same PostgreSQL database and MinIO warehouse. Running them simultaneously can cause metadata conflicts and confusion about which catalog "owns" which tables. The `full` profile is intended for **testing purposes only**.
 
-| Profile | Services Started | Use Case |
-|---------|-----------------|----------|
-| *(none)* | MinIO, PostgreSQL | Core infrastructure only (uses PostgreSQL JDBC catalog) |
-| `nessie` | + Nessie | Iceberg catalog with Git-like versioning |
-| `lakekeeper` | + Lakekeeper + bootstrap | Alternative Iceberg REST catalog |
-| `dremio` | + Nessie + Dremio | Query federation with Arrow Flight |
-| `unity` | + Unity Catalog | Databricks Unity Catalog (experimental) |
-| `spark` | + Spark Master/Worker | Distributed Spark cluster (combine with a catalog profile) |
-| `full` | All services | **Testing only** - runs all catalogs simultaneously |
+| Profile      | Services Started         | Use Case                                                   |
+| ------------ | ------------------------ | ---------------------------------------------------------- |
+| *(none)*     | MinIO, PostgreSQL        | Core infrastructure only (uses PostgreSQL JDBC catalog)    |
+| `nessie`     | + Nessie                 | Iceberg catalog with Git-like versioning                   |
+| `lakekeeper` | + Lakekeeper + bootstrap | Alternative Iceberg REST catalog                           |
+| `dremio`     | + Nessie + Dremio        | Query federation with Arrow Flight                         |
+| `unity`      | + Unity Catalog          | Databricks Unity Catalog (experimental)                    |
+| `spark`      | + Spark Master/Worker    | Distributed Spark cluster (combine with a catalog profile) |
+| `full`       | All services             | **Testing only** - runs all catalogs simultaneously        |
 
 ### Recommended Usage
 
@@ -134,33 +134,33 @@ Each catalog maintains its own metadata about tables in the warehouse:
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CATALOG` | `nessie` | Active catalog: `nessie`, `lakekeeper`, `postgres`, `unity_catalog` |
-| `AWS_ACCESS_KEY_ID` | `minioadmin` | MinIO access key |
-| `AWS_SECRET_ACCESS_KEY` | `miniopassword` | MinIO secret key |
-| `AWS_ENDPOINT_URL` | `http://localhost:9000` | S3 endpoint |
-| `POSTGRES_USER` | `user` | PostgreSQL username |
-| `POSTGRES_PASSWORD` | `password` | PostgreSQL password |
-| `POSTGRES_DB` | `catalog_db` | PostgreSQL database name |
+| Variable                | Default                 | Description                                                         |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------- |
+| `CATALOG`               | `nessie`                | Active catalog: `nessie`, `lakekeeper`, `postgres`, `unity_catalog` |
+| `AWS_ACCESS_KEY_ID`     | `minioadmin`            | MinIO access key                                                    |
+| `AWS_SECRET_ACCESS_KEY` | `miniopassword`         | MinIO secret key                                                    |
+| `AWS_ENDPOINT_URL`      | `http://localhost:9000` | S3 endpoint                                                         |
+| `POSTGRES_USER`         | `user`                  | PostgreSQL username                                                 |
+| `POSTGRES_PASSWORD`     | `password`              | PostgreSQL password                                                 |
+| `POSTGRES_DB`           | `catalog_db`            | PostgreSQL database name                                            |
 
 ### Matching Catalog to Profile
 
 Ensure your `.env` `CATALOG` setting matches the Docker profile you're using:
 
-| Profile | CATALOG Setting |
-|---------|-----------------|
-| `nessie` | `CATALOG=nessie` |
-| `lakekeeper` | `CATALOG=lakekeeper` |
-| `dremio` | `CATALOG=nessie` |
-| *(core only)* | `CATALOG=postgres` |
+| Profile       | CATALOG Setting      |
+| ------------- | -------------------- |
+| `nessie`      | `CATALOG=nessie`     |
+| `lakekeeper`  | `CATALOG=lakekeeper` |
+| `dremio`      | `CATALOG=nessie`     |
+| *(core only)* | `CATALOG=postgres`   |
 
 ## Usage
 
 ### Using the Ibis Connection (Recommended)
 
 ```python
-from poor_man_lakehouse.ibis.builder import IbisConnection
+from poor_man_lakehouse.ibis_connector.builder import IbisConnection
 
 # Connections are lazily initialized
 conn = IbisConnection()
@@ -195,7 +195,7 @@ df = spark.sql("SELECT * FROM nessie.default.my_table")
 ### Using Dremio for Query Federation
 
 ```python
-from poor_man_lakehouse.dremio.builder import DremioConnection
+from poor_man_lakehouse.dremio_connector.builder import DremioConnection
 
 conn = DremioConnection()
 
@@ -257,12 +257,12 @@ just up-clean nessie
 
 ## Supported Catalogs
 
-| Catalog | Status | Notes |
-|---------|--------|-------|
-| **Nessie** | Stable | Git-like versioning, REST API, recommended for development |
-| **Lakekeeper** | Stable | Simple REST catalog, good for production |
-| **PostgreSQL** | Stable | JDBC-based, simplest setup |
-| **Unity Catalog** | Experimental | Requires additional configuration |
+| Catalog           | Status       | Notes                                                      |
+| ----------------- | ------------ | ---------------------------------------------------------- |
+| **Nessie**        | Stable       | Git-like versioning, REST API, recommended for development |
+| **Lakekeeper**    | Stable       | Simple REST catalog, good for production                   |
+| **PostgreSQL**    | Stable       | JDBC-based, simplest setup                                 |
+| **Unity Catalog** | Experimental | Requires additional configuration                          |
 
 ## Roadmap
 

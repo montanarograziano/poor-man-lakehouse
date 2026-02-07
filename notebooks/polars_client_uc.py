@@ -11,7 +11,7 @@ def _():
     import marimo as mo
     import polars as pl
 
-    from poor_man_lakehouse.polars import PolarsClient
+    from poor_man_lakehouse.polars_connector import PolarsClient
 
     # Initialize the client
     cl = PolarsClient()

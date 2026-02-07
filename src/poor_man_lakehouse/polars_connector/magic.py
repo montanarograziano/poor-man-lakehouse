@@ -4,7 +4,7 @@ This module provides Databricks-style %%sql cell magic for Jupyter notebooks.
 
 Usage:
     # In a Jupyter notebook cell:
-    from poor_man_lakehouse.polars import PolarsClient, load_sql_magic
+    from poor_man_lakehouse.polars_connector import PolarsClient, load_sql_magic
 
     client = PolarsClient()
     load_sql_magic(client)
@@ -30,7 +30,7 @@ import polars as pl
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
 
-    from poor_man_lakehouse.polars.client import PolarsClient
+    from poor_man_lakehouse.polars_connector.client import PolarsClient
 
 # Global client instance
 _client: PolarsClient | None = None
@@ -46,7 +46,7 @@ def get_client() -> "PolarsClient":
     """Get the global PolarsClient instance, creating one if needed."""
     global _client
     if _client is None:
-        from poor_man_lakehouse.polars.client import PolarsClient
+        from poor_man_lakehouse.polars_connector.client import PolarsClient
 
         _client = PolarsClient()
     return _client
