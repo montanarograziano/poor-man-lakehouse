@@ -202,61 +202,61 @@ services:
   # DREMIO (profile: dremio, full) - requires nessie
   # =============================================================================
 
-  dremio:
-    profiles: ["dremio", "full"]
-    platform: linux/x86_64
-    image: dremio/dremio-oss:latest
-    ports:
-      - "9047:9047"
-      - "31010:31010"
-      - "32010:32010"
-    container_name: dremio
-    depends_on:
-      minio:
-        condition: service_healthy
-      nessie:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9047"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    environment:
-      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-      DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
-    volumes:
-      - ./configs/dremio/data:/opt/dremio/data
-      - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
-      - ./configs/dremio/logs:/opt/dremio/logs
-      - ./configs/dremio/local:/localFiles
-      - ./configs/dremio/plugins:/opt/dremio/plugins
+  # dremio:
+  #   profiles: ["dremio", "full"]
+  #   platform: linux/x86_64
+  #   image: dremio/dremio-oss:latest
+  #   ports:
+  #     - "9047:9047"
+  #     - "31010:31010"
+  #     - "32010:32010"
+  #   container_name: dremio
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #     nessie:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9047"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   environment:
+  #     DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+  #     DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+  #     DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
+  #   volumes:
+  #     - ./configs/dremio/data:/opt/dremio/data
+  #     - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
+  #     - ./configs/dremio/logs:/opt/dremio/logs
+  #     - ./configs/dremio/local:/localFiles
+  #     - ./configs/dremio/plugins:/opt/dremio/plugins
 
-  dremio-init-catalog:
-    profiles: ["dremio", "full"]
-    image: alpine/curl:latest
-    container_name: dremio-init-catalog
-    depends_on:
-      dremio:
-        condition: service_healthy
-      nessie:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-      DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-      DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
-      NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
-    volumes:
-      - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
-    entrypoint: /usr/local/bin/init_dremio.sh
+  # dremio-init-catalog:
+    # profiles: ["dremio", "full"]
+    # image: alpine/curl:latest
+    # container_name: dremio-init-catalog
+    # depends_on:
+    #   dremio:
+    #     condition: service_healthy
+    #   nessie:
+    #     condition: service_healthy
+    #   minio:
+    #     condition: service_healthy
+    # env_file: .env
+    # environment:
+    #   DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
+    #   DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
+    #   DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
+    #   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+    #   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+    #   AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
+    #   NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
+    # volumes:
+    #   - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
+    # entrypoint: /usr/local/bin/init_dremio.sh
 
   # =============================================================================
   # UNITY CATALOG (profile: unity, full)
@@ -286,44 +286,44 @@ services:
   # SPARK CLUSTER (profile: spark, full)
   # =============================================================================
 
-  # spark-master:
-  #   profiles: ["spark", "full"]
-  #   image: bitnami/spark:4.0.0
-  #   command: bin/spark-class org.apache.spark.deploy.master.Master
-  #   hostname: spark-master
-  #   ports:
-  #     - "8081:8080"
-  #     - "7077:7077"
-  #     - "10000:10000"
-  #   environment:
-  #     SPARK_MASTER_HOST: spark-master
-  #     SPARK_MASTER_PORT: 7077
-  #     SPARK_DRIVER_PORT: 7001
-  #     SPARK_BLOCKMGR_PORT: 7002
-  #     SPARK_WORKER_PORT: 7003
-  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-  #     AWS_ENDPOINT_URL: http://minio:9000
-  #     SPARK_CONF_DIR: /opt/spark/conf
-  #   volumes:
-  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
+  spark-master:
+    profiles: ["spark", "full"]
+    image: apache/spark:4.0.1-scala2.13-java17-python3-ubuntu
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    hostname: spark-master
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT_URL: http://localhost:9000
+      SPARK_CONF_DIR: /opt/spark/conf
+    volumes:
+      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    depends_on:
+      minio:
+        condition: service_healthy
 
-  # spark-worker:
-  #   profiles: ["spark", "full"]
-  #   image: bitnami/spark:4.0.0
-  #   hostname: spark-worker
-  #   command: spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-  #   environment:
-  #     SPARK_MASTER_HOST: spark-master
-  #     SPARK_MASTER_PORT: 7077
-  #     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-  #     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-  #     AWS_ENDPOINT_URL: http://minio:9000
-  #     SPARK_CONF_DIR: /opt/spark/conf
-  #   volumes:
-  #     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-  #   depends_on:
-  #     - spark-master
+  spark-worker:
+    profiles: ["spark", "full"]
+    image: apache/spark:4.0.1-scala2.13-java17-python3-ubuntu
+    hostname: spark-worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    ports:
+      - "8082:8081"
+    environment:
+      SPARK_WORKER_WEBUI_PORT: 8081
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://localhost:9000}
+      SPARK_CONF_DIR: /opt/spark/conf
+    volumes:
+      - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    depends_on:
+      spark-master:
+        condition: service_started
+      minio:
+        condition: service_healthy

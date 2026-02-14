@@ -10,7 +10,7 @@ authors = [
 ]
 
 dependencies = [
-    "delta-spark==4.0.0",
+    "delta-spark==4.0.1",
     "ibis-framework[duckdb,polars,pyspark]>=10.5.0",
     "minio>=7.2.15",
     "pyiceberg[s3fs,sql-postgres,sql-sqlite,pyiceberg-core]>=0.9.1",
@@ -22,7 +22,7 @@ dependencies = [
     "setuptools>=80.9.0",
     "marimo>=0.17.7",
     "pysail==0.4.6",
-    "pyspark[connect,sql]==4.0.0",
+    "pyspark[connect,sql]==4.0.1",
     "psycopg2-binary>=2.9.11",
 ]
 

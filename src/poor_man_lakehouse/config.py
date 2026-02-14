@@ -80,7 +80,10 @@ class Settings(BaseSettings):
     DREMIO_ROOT_EMAIL: str = "admin@example.com"
 
     # Spark settings
-    SPARK_MASTER: str = "spark://spark-master:7077"
+    SPARK_MASTER: str = "spark://localhost:7077"
+    SPARK_DRIVER_HOST: str = "172.18.0.1"
+    SPARK_DRIVER_PORT: int = 7001
+    SPARK_DRIVER_BLOCK_MANAGER_PORT: int = 7002
 
     # AWS Path
     BUCKET_NAME: str = "warehouse"
@@ -91,11 +94,10 @@ class Settings(BaseSettings):
         self.S3_STORAGE_OPTIONS = {
             "AWS_ACCESS_KEY_ID": self.AWS_ACCESS_KEY_ID,
             "AWS_SECRET_ACCESS_KEY": self.AWS_SECRET_ACCESS_KEY,
-            "AWS_SESSION_TOKEN": self.AWS_SESSION_TOKEN,
+            # "AWS_SESSION_TOKEN": self.AWS_SESSION_TOKEN,
             "AWS_REGION": self.AWS_DEFAULT_REGION,
-            "AWS_DEFAULT_REGION": self.AWS_DEFAULT_REGION,
             "AWS_ENDPOINT_URL": self.AWS_ENDPOINT_URL,
-            "AWS_ALLOW_HTTP": "true",
+            "allow_http": "true",
             "aws_conditional_put": "etag",
         }
 
