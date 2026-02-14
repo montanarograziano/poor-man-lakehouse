@@ -24,7 +24,7 @@ SPARK_MAJOR_MINOR = "4.0"
 COMMON_PACKAGES: list[str] = [
     f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_MAJOR_MINOR}_{SCALA_VERSION}:1.10.1",
     "org.apache.iceberg:iceberg-aws-bundle:1.10.1",
-    "org.apache.hadoop:hadoop-aws:3.4.0",
+    "org.apache.hadoop:hadoop-aws:3.4.1",
     "org.postgresql:postgresql:42.7.3",
     f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.106.0",
     f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.1",
@@ -72,7 +72,14 @@ class SparkBuilder(ABC):
 
     def _create_base_builder(self) -> SparkSession.Builder:
         """Create a fresh SparkSession builder with common configuration."""
-        return SparkSession.builder.appName(self._app_name).master(settings.SPARK_MASTER)
+        return (
+            SparkSession.builder.appName(self._app_name)
+            .master(settings.SPARK_MASTER)
+            .config("spark.driver.host", settings.SPARK_DRIVER_HOST)
+            .config("spark.driver.bindAddress", "0.0.0.0")  # noqa: S104
+            .config("spark.driver.port", settings.SPARK_DRIVER_PORT)
+            .config("spark.driver.blockManager.port", settings.SPARK_DRIVER_BLOCK_MANAGER_PORT)
+        )
 
     def _get_packages(self) -> list[str]:
         """Get the list of Maven packages to include.
