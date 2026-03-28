@@ -1,8 +1,10 @@
 import os
 import sys
 from functools import cache
+from pathlib import Path
 
 from loguru import logger
+from pydantic import computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,9 +15,7 @@ class SettingsError(Exception):
 class Settings(BaseSettings):
     """Settings class for application settings and secrets management.
 
-    Official documentation on pydantic settings management.
-
-    - https://pydantic-docs.helpmanual.io/usage/settings/.
+    Docs: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
     """
 
     model_config = SettingsConfigDict(
@@ -27,16 +27,14 @@ class Settings(BaseSettings):
     # Application Path
     APP_NAME: str = "Poor Man Lakehouse"
     PROJECT_NAME: str = "poor-man-lakehouse"
-    REPO_PATH: str = os.path.abspath(".")
-    SETTINGS_PATH: str = os.path.join(REPO_PATH, "settings")
+    REPO_PATH: str = str(Path.cwd())
 
     # Logger
     LOG_VERBOSITY: str = "DEBUG"
     LOG_ROTATION_SIZE: str = "100MB"
     LOG_RETENTION: str = "30 days"
-    LOG_FOLDER: str = os.path.join(REPO_PATH, "logs")
+    LOG_FOLDER: str = ""
     LOG_FILE_NAME: str = "{time:D-M-YY}.log"
-    LOG_FILE_PATH: str = os.path.join(LOG_FOLDER, LOG_FILE_NAME)
 
     # AWS Credentials
     AWS_DEFAULT_REGION: str = "eu-central-1"
@@ -56,7 +54,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "lakehouse_db"
 
     # Catalog settings
-    CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie"
+    CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie", "lakekeeper", "postgres"
     CATALOG_URI: str = "http://localhost:8080"
     CATALOG_NAME: str = "nessie"
     CATALOG_DEFAULT_SCHEMA: str = "default"
@@ -87,16 +85,44 @@ class Settings(BaseSettings):
 
     # AWS Path
     BUCKET_NAME: str = "warehouse"
-    WAREHOUSE_BUCKET: str = f"s3://{BUCKET_NAME}/"
 
-    def _configure_data_path(self):
-        """Configure S3 storage options."""
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def WAREHOUSE_BUCKET(self) -> str:
+        """Compute warehouse bucket URI from BUCKET_NAME."""
+        return f"s3://{self.BUCKET_NAME}/"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def SETTINGS_PATH(self) -> str:
+        """Compute settings path from REPO_PATH."""
+        return os.path.join(self.REPO_PATH, "settings")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def LOG_FILE_PATH(self) -> str:
+        """Compute log file path from LOG_FOLDER and LOG_FILE_NAME."""
+        return os.path.join(self.log_folder_resolved, self.LOG_FILE_NAME)
+
+    @property
+    def log_folder_resolved(self) -> str:
+        """Resolve log folder, defaulting to REPO_PATH/logs."""
+        return self.LOG_FOLDER or os.path.join(self.REPO_PATH, "logs")
+
+    @model_validator(mode="after")
+    def _initialize(self) -> "Settings":
+        """Configure storage options after all fields are set."""
+        self._configure_data_path()
+        return self
+
+    def _configure_data_path(self) -> None:
+        """Configure S3 and Iceberg storage options."""
         self.S3_STORAGE_OPTIONS = {
             "AWS_ACCESS_KEY_ID": self.AWS_ACCESS_KEY_ID,
             "AWS_SECRET_ACCESS_KEY": self.AWS_SECRET_ACCESS_KEY,
-            # "AWS_SESSION_TOKEN": self.AWS_SESSION_TOKEN,
             "AWS_REGION": self.AWS_DEFAULT_REGION,
             "AWS_ENDPOINT_URL": self.AWS_ENDPOINT_URL,
+            "AWS_ALLOW_HTTP": "true",
             "allow_http": "true",
             "aws_conditional_put": "etag",
         }
@@ -113,8 +139,8 @@ class Settings(BaseSettings):
 
     def _setup_logger(self) -> None:
         """Configure loguru logger with stderr and file handlers."""
-        logger.remove()  # to remove previous handlers and reset
-        log_file_path = os.path.join(self.LOG_FOLDER, self.LOG_FILE_NAME)
+        logger.remove()
+        log_file_path = os.path.join(self.log_folder_resolved, self.LOG_FILE_NAME)
         logger.add(
             sink=sys.stderr,
             colorize=True,
@@ -150,7 +176,6 @@ def get_settings() -> Settings:
     """
     try:
         settings = Settings()
-        settings._configure_data_path()
         settings._setup_logger()
         return settings
 
