@@ -1,0 +1,114 @@
+"""Unit tests for the ibis_connector module."""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+class TestIbisConnectionInit:
+    """Tests for IbisConnection initialization."""
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_raises_if_catalog_not_lakekeeper(self, mock_settings):
+        """Test that IbisConnection raises ValueError for non-lakekeeper catalogs."""
+        mock_settings.CATALOG = "nessie"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        with pytest.raises(ValueError, match="Only the Lakekeeper catalog is supported"):
+            IbisConnection()
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_init_with_lakekeeper_catalog(self, mock_settings):
+        """Test that IbisConnection initializes when catalog is lakekeeper."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        assert conn._catalog_name == "lakekeeper"
+        assert conn._lakekeeper_endpoint == "http://lakekeeper:8181/catalog"
+
+
+class TestIbisConnectionGetConnection:
+    """Tests for get_connection method."""
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_get_connection_raises_for_unsupported_engine(self, mock_settings):
+        """Test that get_connection raises for unsupported engines."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        with pytest.raises(ValueError, match="Unsupported engine"):
+            conn.get_connection("invalid")  # type: ignore[arg-type]
+
+
+class TestIbisConnectionSQL:
+    """Tests for SQL execution methods."""
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_sql_raises_for_polars_engine(self, mock_settings):
+        """Test that sql() raises for polars engine (SQL not supported)."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        with pytest.raises(ValueError, match="SQL execution only supports"):
+            conn.sql("SELECT 1", "polars")  # type: ignore[arg-type]
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_set_current_database_raises_for_polars(self, mock_settings):
+        """Test that set_current_database raises for polars engine."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        with pytest.raises(ValueError, match="does not support database switching"):
+            conn.set_current_database("default", "polars")  # type: ignore[arg-type]
+
+
+class TestIbisConnectionReadTable:
+    """Tests for read_table method."""
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_read_table_raises_for_unsupported_engine(self, mock_settings):
+        """Test that read_table raises for unsupported engines."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        with pytest.raises(ValueError, match="Unsupported engine for read_table"):
+            conn.read_table("default", "test_table", "invalid")  # type: ignore[arg-type]
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_read_table_pyspark_wraps_errors(self, mock_settings):
+        """Test that read_table wraps PySpark errors in ValueError."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        # Mock the pyspark cached_property to raise
+        mock_pyspark = MagicMock()
+        mock_pyspark.table.side_effect = RuntimeError("table not found")
+        conn.__dict__["_pyspark_connection"] = mock_pyspark
+
+        with pytest.raises(ValueError, match="Could not read table"):
+            conn.read_table("default", "test_table", "pyspark")
