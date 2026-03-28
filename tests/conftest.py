@@ -39,13 +39,15 @@ def mock_settings():
         mock_instance.BUCKET_NAME = "warehouse"
         mock_instance.WAREHOUSE_BUCKET = "s3a://warehouse/"
 
-        # Storage options (populated by _configure_data_path)
+        # Storage options (populated by model_validator _initialize)
         mock_instance.S3_STORAGE_OPTIONS = {
             "AWS_ACCESS_KEY_ID": "test-access-key",
             "AWS_SECRET_ACCESS_KEY": "test-secret-key",
+            "AWS_REGION": "eu-central-1",
             "AWS_ENDPOINT_URL": "http://localhost:9000",
-            "AWS_DEFAULT_REGION": "eu-central-1",
             "AWS_ALLOW_HTTP": "true",
+            "allow_http": "true",
+            "aws_conditional_put": "etag",
         }
         mock_instance.ICEBERG_STORAGE_OPTIONS = {
             "s3.endpoint": "http://localhost:9000",
