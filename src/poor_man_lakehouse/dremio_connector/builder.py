@@ -185,7 +185,7 @@ class DremioConnection:
             )
             if response.status_code == 200:
                 token = response.json().get("token", "")
-                return token if token else None
+                return token or None
             logger.warning(f"Initial token request failed. Status code: {response.status_code}")
             return None
         except requests.RequestException as e:
