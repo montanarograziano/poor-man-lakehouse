@@ -76,7 +76,7 @@ services:
 
   nessie:
     profiles: ["nessie", "dremio", "full"]
-    image: ghcr.io/projectnessie/nessie:0.106.1-java
+    image: ghcr.io/projectnessie/nessie:0.107.2-java
     container_name: nessie
     depends_on:
       minio:
@@ -288,42 +288,50 @@ services:
 
   spark-master:
     profiles: ["spark", "full"]
-    image: apache/spark:4.0.1-scala2.13-java17-python3-ubuntu
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    image: apache/spark:4.0.1-scala2.13-java21-python3-ubuntu
+    container_name: spark-master
     hostname: spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     ports:
-      - "8081:8080"
-      - "7077:7077"
+      - "8081:8080"    # Master Web UI
+      - "7077:7077"    # Master RPC port
     environment:
       SPARK_MASTER_HOST: spark-master
       SPARK_MASTER_PORT: 7077
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT_URL: http://localhost:9000
       SPARK_CONF_DIR: /opt/spark/conf
     volumes:
       - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       minio:
         condition: service_healthy
 
   spark-worker:
     profiles: ["spark", "full"]
-    image: apache/spark:4.0.1-scala2.13-java17-python3-ubuntu
+    image: apache/spark:4.0.1-scala2.13-java21-python3-ubuntu
+    container_name: spark-worker
     hostname: spark-worker
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "8082:8081"
+      - "8082:8081"    # Worker Web UI
     environment:
       SPARK_WORKER_WEBUI_PORT: 8081
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://localhost:9000}
       SPARK_CONF_DIR: /opt/spark/conf
     volumes:
       - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       spark-master:
-        condition: service_started
+        condition: service_healthy
       minio:
         condition: service_healthy
