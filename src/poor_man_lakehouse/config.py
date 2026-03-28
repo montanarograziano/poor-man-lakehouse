@@ -190,5 +190,24 @@ def reload_settings() -> Settings:
     return get_settings()
 
 
+def require_catalog(expected: str, *, connector_name: str, current_settings: Settings | None = None) -> None:
+    """Validate that the active catalog matches the expected one.
+
+    Args:
+        expected: The required catalog name.
+        connector_name: Name of the connector for error messages.
+        current_settings: Settings instance to check. Defaults to the global singleton.
+
+    Raises:
+        ValueError: If the active catalog doesn't match.
+    """
+    s = current_settings or get_settings()
+    if s.CATALOG.lower() != expected.lower():
+        raise ValueError(
+            f"{connector_name} requires '{expected}' catalog, "
+            f"but CATALOG='{s.CATALOG}'. Set CATALOG={expected} in your environment."
+        )
+
+
 # default settings with initialization
 settings = get_settings()
