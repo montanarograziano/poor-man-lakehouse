@@ -1,6 +1,6 @@
 """Spark session builders for different catalog implementations.
 
-All builders share common JARs (Iceberg, Delta, Hadoop-AWS) for Spark 4.0.0 compatibility.
+All builders share common JARs (Iceberg, Delta, Hadoop-AWS) for Spark 4.0.1 compatibility.
 Delta support is enabled via configure_spark_with_delta_pip for all builders, allowing
 path-based Delta table access (e.g., spark.read.format("delta").load("s3a://...")).
 The main difference between implementations is the catalog configuration for Iceberg tables.
@@ -19,15 +19,15 @@ from poor_man_lakehouse.config import settings
 SCALA_VERSION = "2.13"
 SPARK_MAJOR_MINOR = "4.0"
 
-# Common packages for all Spark 4.0.0 implementations
+# Common packages for all Spark 4.0.1 implementations
 # These provide Iceberg, Delta (via configure_spark_with_delta_pip), and S3 support
 COMMON_PACKAGES: list[str] = [
     f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_MAJOR_MINOR}_{SCALA_VERSION}:1.10.1",
     "org.apache.iceberg:iceberg-aws-bundle:1.10.1",
     "org.apache.hadoop:hadoop-aws:3.4.1",
-    "org.postgresql:postgresql:42.7.3",
-    f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.106.0",
-    f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.1",
+    "org.postgresql:postgresql:42.7.10",
+    f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.107.2",
+    f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.4.0",
 ]
 
 
@@ -201,7 +201,7 @@ class DeltaUnityCatalogSparkBuilder(SparkBuilder):
     - Only set endpoint and path-style config for MinIO compatibility
     """
 
-    UNITY_CATALOG_PACKAGE: ClassVar[str] = f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.3.0"
+    UNITY_CATALOG_PACKAGE: ClassVar[str] = f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.4.0"
 
     def _get_packages(self) -> list[str]:
         packages = super()._get_packages()
