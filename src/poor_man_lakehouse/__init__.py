@@ -4,6 +4,7 @@ from poor_man_lakehouse.config import Settings, get_settings, reload_settings, s
 from poor_man_lakehouse.dremio_connector import DremioConnection
 from poor_man_lakehouse.ibis_connector import IbisConnection
 from poor_man_lakehouse.polars_connector import PolarsClient, load_sql_magic
+from poor_man_lakehouse.pyiceberg_connector import PyIcebergClient
 from poor_man_lakehouse.spark_connector import (
     CatalogType,
     get_spark_builder,
@@ -20,6 +21,7 @@ __all__ = [
     "DremioConnection",
     "IbisConnection",
     "PolarsClient",
+    "PyIcebergClient",
     "load_sql_magic",
     # Spark
     "CatalogType",
