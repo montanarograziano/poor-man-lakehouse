@@ -339,3 +339,17 @@ class DremioConnection:
         except requests.RequestException as e:
             logger.error(f"Request failed while creating Nessie catalog: {e}")
             return False
+
+    def close(self) -> None:
+        """Close the Arrow Flight client."""
+        if hasattr(self, "client") and self.client is not None:
+            self.client.close()
+            logger.debug("DremioConnection closed")
+
+    def __enter__(self) -> "DremioConnection":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object) -> None:
+        """Exit context manager and close connection."""
+        self.close()

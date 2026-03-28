@@ -133,3 +133,15 @@ class TestDremioConnectionQuery:
 
         result = conn.to_arrow("SELECT 1")
         assert result == mock_stream
+
+
+class TestDremioConnectionLifecycle:
+    """Tests for connection lifecycle management."""
+
+    def test_has_context_manager_protocol(self):
+        """Test that DremioConnection has context manager and close methods."""
+        from poor_man_lakehouse.dremio_connector.builder import DremioConnection
+
+        assert hasattr(DremioConnection, "__enter__")
+        assert hasattr(DremioConnection, "__exit__")
+        assert hasattr(DremioConnection, "close")
