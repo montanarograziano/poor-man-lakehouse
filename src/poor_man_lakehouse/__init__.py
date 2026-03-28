@@ -1,5 +1,6 @@
 """Poor Man Lakehouse - Multi-engine data lakehouse connectors."""
 
+from poor_man_lakehouse.catalog_browser import CatalogBrowser
 from poor_man_lakehouse.config import Settings, get_settings, reload_settings, settings
 from poor_man_lakehouse.dremio_connector import DremioConnection
 from poor_man_lakehouse.ibis_connector import IbisConnection
@@ -12,6 +13,8 @@ from poor_man_lakehouse.spark_connector import (
 )
 
 __all__ = [
+    # Catalog
+    "CatalogBrowser",
     # Config
     "Settings",
     "get_settings",
