@@ -112,3 +112,60 @@ class TestIbisConnectionReadTable:
 
         with pytest.raises(ValueError, match="Could not read table"):
             conn.read_table("default", "test_table", "pyspark")
+
+
+class TestIbisConnectionWriteTable:
+    """Tests for write_table method."""
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_write_table_raises_for_unsupported_engine(self, mock_settings):
+        """Test that write_table raises ValueError for non-DuckDB engines."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        with pytest.raises(ValueError, match="only supported with DuckDB"):
+            conn.write_table("default", "test", "pyspark", mode="append")
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_write_table_raises_for_invalid_mode(self, mock_settings):
+        """Test that write_table raises ValueError for unsupported write modes."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        with pytest.raises(ValueError, match="Unsupported write mode"):
+            conn.write_table("default", "test", "duckdb", mode="invalid")
+
+
+class TestIbisConnectionLifecycle:
+    """Tests for connection lifecycle management."""
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_context_manager_protocol(self, mock_settings):
+        """Test that IbisConnection works as a context manager."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        with IbisConnection() as conn:
+            assert conn._catalog_name == "lakekeeper"
+
+    @patch("poor_man_lakehouse.ibis_connector.builder.settings")
+    def test_close_clears_cached_properties(self, mock_settings):
+        """Test that close() removes cached connection properties."""
+        mock_settings.CATALOG = "lakekeeper"
+        mock_settings.CATALOG_NAME = "lakekeeper"
+        mock_settings.LAKEKEEPER_SERVER_URI = "http://lakekeeper:8181/catalog"
+        from poor_man_lakehouse.ibis_connector.builder import IbisConnection
+
+        conn = IbisConnection()
+        conn.close()
+        assert "_duckdb_connection" not in conn.__dict__
+        assert "_pyspark_connection" not in conn.__dict__
+        assert "_polars_connection" not in conn.__dict__

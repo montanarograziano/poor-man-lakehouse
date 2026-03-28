@@ -31,10 +31,12 @@ if TYPE_CHECKING:
 
 Engine = Literal["pyspark", "polars", "duckdb"]
 SQLEngine = Literal["pyspark", "duckdb"]
+WriteMode = Literal["append", "overwrite"]
 
 # Supported engines for validation
 _SUPPORTED_ENGINES: set[str] = {"pyspark", "polars", "duckdb"}
 _SQL_ENGINES: set[str] = {"pyspark", "duckdb"}
+_WRITE_MODES: set[str] = {"append", "overwrite"}
 
 
 class IbisConnection:
@@ -292,3 +294,79 @@ class IbisConnection:
                 raise ValueError(f"Could not read table {database}.{table_name} with Polars: {e}") from e
 
         raise ValueError(f"Unsupported engine for read_table: {engine}")
+
+    def write_table(
+        self,
+        database: str,
+        table_name: str,
+        engine: Engine,
+        *,
+        data: Table | None = None,
+        query: str | None = None,
+        mode: WriteMode = "append",
+    ) -> None:
+        """Write data to an Iceberg table via DuckDB.
+
+        Args:
+            database: The database/namespace name.
+            table_name: The table name.
+            engine: Must be "duckdb".
+            data: Ibis table expression to write. Mutually exclusive with query.
+            query: SQL query whose results to write. Mutually exclusive with data.
+            mode: Write mode — "append" (INSERT INTO) or "overwrite" (INSERT OVERWRITE).
+
+        Raises:
+            ValueError: If engine is not duckdb, mode is invalid, or neither data nor query provided.
+        """
+        if engine != "duckdb":
+            raise ValueError(f"Write operations are only supported with DuckDB engine, got: '{engine}'")
+        if mode not in _WRITE_MODES:
+            raise ValueError(f"Unsupported write mode: '{mode}'. Supported: {_WRITE_MODES}")
+        if data is None and query is None:
+            raise ValueError("Either 'data' or 'query' must be provided")
+
+        fqn = f"{self._catalog_name}.{database}.{table_name}"
+        self.set_current_database(database, "duckdb")
+
+        sql_prefix = f"INSERT OVERWRITE {fqn}" if mode == "overwrite" else f"INSERT INTO {fqn}"  # noqa: S608
+
+        if query is not None:
+            self._duckdb_connection.raw_sql(f"{sql_prefix} {query}")  # noqa: S608
+        elif data is not None:
+            self._duckdb_connection.raw_sql(f"CREATE OR REPLACE TEMP VIEW _write_staging AS {data.compile()}")  # noqa: S608
+            self._duckdb_connection.raw_sql(f"{sql_prefix} SELECT * FROM _write_staging")  # noqa: S608
+            self._duckdb_connection.raw_sql("DROP VIEW IF EXISTS _write_staging")
+
+        logger.info(f"Wrote to {fqn} (mode={mode}) via DuckDB")
+
+    def create_table(
+        self,
+        database: str,
+        table_name: str,
+        schema_sql: str,
+    ) -> None:
+        """Create an Iceberg table via DuckDB.
+
+        Args:
+            database: The database/namespace name.
+            table_name: The table name.
+            schema_sql: Column definitions, e.g. "id INTEGER, name VARCHAR".
+        """
+        fqn = f"{self._catalog_name}.{database}.{table_name}"
+        self._duckdb_connection.raw_sql(f"CREATE TABLE IF NOT EXISTS {fqn} ({schema_sql})")  # noqa: S608
+        logger.info(f"Created table {fqn}")
+
+    def close(self) -> None:
+        """Close all active connections and clear cached properties."""
+        for prop in ("_duckdb_connection", "_pyspark_connection", "_polars_connection", "pyiceberg_catalog"):
+            if prop in self.__dict__:
+                del self.__dict__[prop]
+        logger.debug("IbisConnection closed")
+
+    def __enter__(self) -> IbisConnection:
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object) -> None:
+        """Exit context manager and close connections."""
+        self.close()
