@@ -1,11 +1,18 @@
 """Polars client for Unity Catalog Delta tables."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 import sqlglot
+from pyiceberg.catalog import load_catalog
 
 from poor_man_lakehouse.config import settings
+
+if TYPE_CHECKING:
+    from pyiceberg.catalog import Catalog
 
 
 @dataclass
@@ -59,6 +66,7 @@ class PolarsClient:
         unity_catalog_uri: str | None = None,
         storage_options: dict | None = None,
         require_https: bool = False,
+        backend: Literal["unity", "lakekeeper"] = "unity",
     ):
         """Initialize the Polars Unity Catalog client.
 
@@ -66,22 +74,40 @@ class PolarsClient:
             unity_catalog_uri: URI of the Unity Catalog server. Defaults to settings.UNITY_CATALOG_URI.
             storage_options: S3 storage options. Defaults to settings.S3_STORAGE_OPTIONS.
             require_https: Whether to require HTTPS for the catalog connection.
+            backend: Catalog backend to use. "unity" for Unity Catalog, "lakekeeper" for Lakekeeper via PyIceberg.
         """
-        self.unity_catalog_uri = unity_catalog_uri or settings.UNITY_CATALOG_URI
-        self.catalog = pl.Catalog(self.unity_catalog_uri, require_https=require_https)
+        self._backend = backend
         self.storage_options = storage_options or settings.S3_STORAGE_OPTIONS
         self._table_cache: dict[str, pl.LazyFrame] = {}
 
+        if backend == "lakekeeper":
+            self.unity_catalog_uri = unity_catalog_uri or settings.LAKEKEEPER_SERVER_URI
+            self._catalog_name = settings.CATALOG_NAME
+            catalog_config = settings.ICEBERG_STORAGE_OPTIONS | {
+                "type": "rest",
+                "uri": self.unity_catalog_uri,
+            }
+            self._pyiceberg_catalog: Catalog = load_catalog(self._catalog_name, **catalog_config)
+        else:
+            self.unity_catalog_uri = unity_catalog_uri or settings.UNITY_CATALOG_URI
+            self.catalog = pl.Catalog(self.unity_catalog_uri, require_https=require_https)
+
     def list_catalogs(self) -> list[str]:
         """List all available catalogs."""
+        if self._backend == "lakekeeper":
+            return [self._catalog_name]
         return [cat.name for cat in self.catalog.list_catalogs()]
 
     def list_namespaces(self, catalog: str) -> list[str]:
         """List all namespaces (schemas) in a catalog."""
+        if self._backend == "lakekeeper":
+            return [ns[0] for ns in self._pyiceberg_catalog.list_namespaces()]
         return [ns.name for ns in self.catalog.list_namespaces(catalog)]
 
     def list_tables(self, catalog: str, namespace: str) -> list[str]:
         """List all tables in a namespace."""
+        if self._backend == "lakekeeper":
+            return [tbl[1] for tbl in self._pyiceberg_catalog.list_tables(namespace)]
         return [tbl.name for tbl in self.catalog.list_tables(catalog, namespace)]
 
     def get_table_info(self, catalog: str, namespace: str, table: str) -> TableInfo:
@@ -108,9 +134,13 @@ class PolarsClient:
         """Internal method to scan a table with caching."""
         cache_key = f"{catalog}.{namespace}.{table}"
         if cache_key not in self._table_cache:
-            self._table_cache[cache_key] = self.catalog.scan_table(
-                catalog, namespace, table, storage_options=self.storage_options
-            )
+            if self._backend == "lakekeeper":
+                iceberg_table = self._pyiceberg_catalog.load_table(f"{namespace}.{table}")
+                self._table_cache[cache_key] = pl.scan_iceberg(iceberg_table)
+            else:
+                self._table_cache[cache_key] = self.catalog.scan_table(
+                    catalog, namespace, table, storage_options=self.storage_options
+                )
         return self._table_cache[cache_key]
 
     def clear_cache(self) -> None:
