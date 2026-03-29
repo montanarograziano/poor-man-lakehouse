@@ -76,7 +76,7 @@ alias c := commit
 
 # Live preview the documentation
 preview-docs:
-  uv run mike serve --config-file=docs/mkdocs.yml
+  uv run mkdocs serve
 
 # Assert a command is available
 [private]

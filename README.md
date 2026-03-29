@@ -161,66 +161,68 @@ All connectors are available as top-level imports:
 
 ```python
 from poor_man_lakehouse import (
-    IbisConnection,
-    DremioConnection,
-    PolarsClient,
-    CatalogType,
-    get_spark_builder,
-    retrieve_current_spark_session,
-    settings,
+    IbisConnection,       # Multi-engine (PySpark, Polars, DuckDB) + writes
+    PyIcebergClient,      # Schema, snapshots, time travel (no JVM)
+    CatalogBrowser,       # Catalog-agnostic browsing
+    PolarsClient,         # SQL queries via Polars
+    DremioConnection,     # Arrow Flight query federation
+    CatalogType,          # Spark catalog enum
+    get_spark_builder,    # Spark session factory
+    settings,             # Global settings
 )
 ```
 
-Or import from subpackages directly:
+### Browse Catalogs (No JVM Required)
 
 ```python
-from poor_man_lakehouse.ibis_connector import IbisConnection
-from poor_man_lakehouse.dremio_connector import DremioConnection
-from poor_man_lakehouse.polars_connector import PolarsClient, load_sql_magic
-from poor_man_lakehouse.spark_connector import CatalogType, get_spark_builder
+from poor_man_lakehouse import CatalogBrowser
+
+browser = CatalogBrowser()  # Auto-resolves URI from CATALOG setting
+print(browser.list_namespaces())
+print(browser.list_tables("default"))
+print(browser.get_table_schema("default", "users"))
 ```
 
-### Using the Ibis Connection (Requires Lakekeeper)
+### PyIceberg Table Management
+
+```python
+from poor_man_lakehouse import PyIcebergClient
+
+client = PyIcebergClient()
+schema = client.table_schema("default", "users")
+history = client.snapshot_history("default", "users")
+df = client.scan_to_polars("default", "users")
+```
+
+### Multi-Engine with Ibis (Requires Lakekeeper)
 
 ```python
 from poor_man_lakehouse import IbisConnection
 
-# Connections are lazily initialized
-conn = IbisConnection()
+with IbisConnection() as conn:
+    # Read via DuckDB, PySpark, or Polars
+    table = conn.read_table("default", "users", "duckdb")
+    result = conn.sql("SELECT * FROM lakekeeper.default.users", "duckdb")
 
-# Use PySpark (starts Spark session on first access)
-spark_conn = conn.get_connection("pyspark")
-tables = conn.list_tables("pyspark")
-
-# Use Polars (lightweight, no JVM)
-polars_conn = conn.get_connection("polars")
-
-# Use DuckDB (in-memory analytics)
-duck_conn = conn.get_connection("duckdb")
-
-# Read Iceberg tables
-df = conn.read_table("default", "my_table", "polars")
-
-# Execute SQL (PySpark and DuckDB only)
-result = conn.sql("SELECT * FROM default.my_table", "duckdb")
+    # Write via DuckDB (Iceberg write support in DuckDB 1.5+)
+    conn.write_table("default", "users", "duckdb",
+                     query="SELECT 1 AS id, 'Alice' AS name")
 ```
 
-### Using the Polars Client (Requires Unity Catalog)
+### Polars Client (Unity Catalog or Lakekeeper)
 
 ```python
 from poor_man_lakehouse import PolarsClient
 
+# Unity Catalog backend (default)
 client = PolarsClient()
 
-# Explore the catalog
-print(client.list_catalogs())
+# Or Lakekeeper backend
+client = PolarsClient(backend="lakekeeper")
+
+# Explore and query
 print(client.list_tables("unity", "default"))
-
-# Run SQL queries
 df = client.sql("SELECT * FROM unity.default.test_table WHERE id > 10")
-
-# Lazy evaluation
-lazy_df = client.sql("SELECT * FROM unity.default.test_table", lazy=True)
 ```
 
 ### Using Spark Builders Directly
@@ -256,28 +258,23 @@ pandas_df = conn.to_pandas("SELECT * FROM nessie.default.my_table")
 ```
 poor-man-lakehouse/
 ├── src/poor_man_lakehouse/
-│   ├── config.py           # Settings management (Pydantic)
-│   ├── spark_connector/
-│   │   └── builder.py      # Spark session builders for each catalog
-│   ├── ibis_connector/
-│   │   └── builder.py      # Multi-engine Ibis connection
-│   ├── polars_connector/
-│   │   ├── client.py       # Polars client for Unity Catalog
-│   │   └── magic.py        # Jupyter %%sql cell magic
-│   └── dremio_connector/
-│       └── builder.py      # Dremio Arrow Flight connection
-├── notebooks/              # Example notebooks
-│   ├── pyspark_experiments.ipynb
-│   ├── ibis_experiments.ipynb
-│   ├── pyiceberg_experiments.ipynb
-│   └── ...
+│   ├── config.py              # Settings management (Pydantic)
+│   ├── catalog_browser.py     # Catalog-agnostic metadata browsing
+│   ├── spark_connector/       # Spark session builders per catalog
+│   ├── ibis_connector/        # Multi-engine Ibis connection + DuckDB writes
+│   ├── pyiceberg_connector/   # Standalone PyIceberg client
+│   ├── polars_connector/      # Polars client (Unity + Lakekeeper) + %%sql magic
+│   └── dremio_connector/      # Dremio Arrow Flight connection
+├── docs/                      # MkDocs documentation site
+├── notebooks/                 # Example notebooks
 ├── tests/
-│   ├── conftest.py         # Shared fixtures
-│   └── unit/               # Unit tests
-├── configs/                # Service configuration files
-├── docker-compose.yml      # Service definitions with profiles
-├── Justfile               # Task runner commands
-└── pyproject.toml         # Project dependencies and tools
+│   ├── unit/                  # Unit tests (76 tests)
+│   └── integration/           # Integration tests (Docker required)
+├── configs/                   # Service configuration files
+├── docker-compose.yml         # Service definitions with profiles
+├── mkdocs.yml                 # Documentation site config
+├── Justfile                   # Task runner commands
+└── pyproject.toml             # Project dependencies and tools
 ```
 
 ## Development
@@ -321,11 +318,15 @@ just up-clean nessie
 - [x] Multi-engine support via Ibis (PySpark, Polars, DuckDB)
 - [x] Lakekeeper catalog support
 - [x] Docker Compose profiles for flexible deployment
+- [x] DuckDB Iceberg write support (DuckDB 1.5+)
+- [x] Standalone PyIceberg connector
+- [x] Catalog-agnostic browser abstraction
+- [x] Polars Lakekeeper backend via PyIceberg
+- [x] MkDocs documentation site
 - [x] CI/CD with GitHub Actions
 - [ ] Unity Catalog full integration
 - [ ] DuckLake support
 - [ ] Kubernetes deployment manifests
-- [ ] MkDocs documentation site
 
 ## Troubleshooting
 
@@ -359,6 +360,16 @@ Ensure your `CATALOG` setting in `.env` matches the profile you started:
 grep CATALOG .env
 
 # Should match: just up <profile>
+```
+
+## Documentation
+
+Full documentation is available at [montanarograziano.github.io/poor-man-lakehouse](https://montanarograziano.github.io/poor-man-lakehouse/).
+
+To preview locally:
+
+```bash
+just preview-docs    # Opens at http://localhost:8000
 ```
 
 ## Contributing
