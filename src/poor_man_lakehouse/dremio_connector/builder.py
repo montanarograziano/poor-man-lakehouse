@@ -185,7 +185,7 @@ class DremioConnection:
             )
             if response.status_code == 200:
                 token = response.json().get("token", "")
-                return token if token else None
+                return token or None
             logger.warning(f"Initial token request failed. Status code: {response.status_code}")
             return None
         except requests.RequestException as e:
@@ -339,3 +339,17 @@ class DremioConnection:
         except requests.RequestException as e:
             logger.error(f"Request failed while creating Nessie catalog: {e}")
             return False
+
+    def close(self) -> None:
+        """Close the Arrow Flight client."""
+        if hasattr(self, "client") and self.client is not None:
+            self.client.close()
+            logger.debug("DremioConnection closed")
+
+    def __enter__(self) -> "DremioConnection":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object) -> None:
+        """Exit context manager and close connection."""
+        self.close()

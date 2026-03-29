@@ -10,51 +10,75 @@ from poor_man_lakehouse.config import Settings, SettingsError, get_settings, rel
 class TestSettings:
     """Tests for the Settings class."""
 
-    def test_default_values(self):
-        """Test that Settings has expected default values.
+    def test_default_values(self, monkeypatch):
+        """Test that Settings has expected default values when no .env or env vars are loaded."""
+        # Clear env vars that would override defaults
+        for key in ("AWS_DEFAULT_REGION", "CATALOG", "CATALOG_NAME"):
+            monkeypatch.delenv(key, raising=False)
 
-        Note: CATALOG and CATALOG_NAME may be overridden by .env file,
-        so we only test values that are not typically configured in .env.
-        """
-        test_settings = Settings()
+        test_settings = Settings(_env_file=None)
         assert test_settings.APP_NAME == "Poor Man Lakehouse"
         assert test_settings.PROJECT_NAME == "poor-man-lakehouse"
         assert test_settings.AWS_DEFAULT_REGION == "eu-central-1"
-        # CATALOG may be overridden by .env, just check it's a valid string
-        assert isinstance(test_settings.CATALOG, str)
-        assert len(test_settings.CATALOG) > 0
+        assert test_settings.CATALOG == "nessie"
+        assert test_settings.CATALOG_NAME == "nessie"
 
-    def test_s3_storage_options_empty_by_default(self):
-        """Test S3 storage options are empty before configuration."""
-        settings = Settings()
-        assert settings.S3_STORAGE_OPTIONS == {}
-        assert settings.ICEBERG_STORAGE_OPTIONS == {}
+    def test_s3_storage_options_populated_after_init(self):
+        """Test S3 storage options are populated via model_validator after init."""
+        test_settings = Settings(_env_file=None)
+        # model_validator runs _configure_data_path automatically
+        assert "AWS_ACCESS_KEY_ID" in test_settings.S3_STORAGE_OPTIONS
+        assert "AWS_ALLOW_HTTP" in test_settings.S3_STORAGE_OPTIONS
+        assert test_settings.S3_STORAGE_OPTIONS["AWS_ALLOW_HTTP"] == "true"
+        assert test_settings.S3_STORAGE_OPTIONS["allow_http"] == "true"
 
     def test_configure_data_path_populates_s3_options(self):
-        """Test _configure_data_path populates S3 storage options."""
-        test_settings = Settings()
-        test_settings.AWS_ACCESS_KEY_ID = "test-key"
-        test_settings.AWS_SECRET_ACCESS_KEY = "test-secret"  # noqa: S105
-        test_settings._configure_data_path()
+        """Test _configure_data_path populates S3 storage options correctly."""
+        test_settings = Settings(
+            _env_file=None,
+            AWS_ACCESS_KEY_ID="test-key",
+            AWS_SECRET_ACCESS_KEY="test-secret",  # noqa: S106
+        )
 
         assert test_settings.S3_STORAGE_OPTIONS["AWS_ACCESS_KEY_ID"] == "test-key"
         assert test_settings.S3_STORAGE_OPTIONS["AWS_SECRET_ACCESS_KEY"] == "test-secret"  # noqa: S105
         assert test_settings.S3_STORAGE_OPTIONS["AWS_ALLOW_HTTP"] == "true"
 
-    def test_configure_data_path_populates_iceberg_options(self):
-        """Test _configure_data_path populates Iceberg storage options."""
-        test_settings = Settings()
-        test_settings.AWS_ACCESS_KEY_ID = "test-key"
-        test_settings.AWS_SECRET_ACCESS_KEY = "test-secret"  # noqa: S105
-        test_settings.AWS_ENDPOINT_URL = "http://minio:9000"
-        test_settings.WAREHOUSE_BUCKET = "s3a://warehouse/"
-        test_settings._configure_data_path()
+    def test_configure_data_path_populates_iceberg_options_nessie(self):
+        """Test _configure_data_path populates Iceberg options for non-lakekeeper catalogs."""
+        test_settings = Settings(
+            _env_file=None,
+            AWS_ACCESS_KEY_ID="test-key",
+            AWS_SECRET_ACCESS_KEY="test-secret",  # noqa: S106
+            AWS_ENDPOINT_URL="http://minio:9000",
+            CATALOG="nessie",
+            BUCKET_NAME="warehouse",
+        )
 
         assert test_settings.ICEBERG_STORAGE_OPTIONS["s3.access-key-id"] == "test-key"
         assert test_settings.ICEBERG_STORAGE_OPTIONS["s3.secret-access-key"] == "test-secret"  # noqa: S105
         assert test_settings.ICEBERG_STORAGE_OPTIONS["s3.endpoint"] == "http://minio:9000"
-        # s3a:// should be converted to s3://
         assert test_settings.ICEBERG_STORAGE_OPTIONS["warehouse"] == "s3://warehouse/"
+
+    def test_configure_data_path_populates_iceberg_options_lakekeeper(self):
+        """Test _configure_data_path uses LAKEKEEPER_WAREHOUSE when catalog is lakekeeper."""
+        test_settings = Settings(
+            _env_file=None,
+            CATALOG="lakekeeper",
+            LAKEKEEPER_WAREHOUSE="my-warehouse",
+        )
+
+        assert test_settings.ICEBERG_STORAGE_OPTIONS["warehouse"] == "my-warehouse"
+
+    def test_warehouse_bucket_computed_from_bucket_name(self):
+        """Test WAREHOUSE_BUCKET is computed from BUCKET_NAME at instance time."""
+        test_settings = Settings(_env_file=None, BUCKET_NAME="my-bucket")
+        assert test_settings.WAREHOUSE_BUCKET == "s3://my-bucket/"
+
+    def test_settings_path_computed_from_repo_path(self):
+        """Test SETTINGS_PATH is computed from REPO_PATH."""
+        test_settings = Settings(_env_file=None, REPO_PATH="/tmp/test")  # noqa: S108
+        assert test_settings.SETTINGS_PATH == "/tmp/test/settings"  # noqa: S108
 
 
 class TestGetSettings:
@@ -62,10 +86,9 @@ class TestGetSettings:
 
     def test_get_settings_returns_settings_instance(self):
         """Test get_settings returns a Settings instance."""
-        # Clear cache first
         get_settings.cache_clear()
-        settings = get_settings()
-        assert isinstance(settings, Settings)
+        result = get_settings()
+        assert isinstance(result, Settings)
 
     def test_get_settings_is_cached(self):
         """Test get_settings returns the same cached instance."""
@@ -79,7 +102,6 @@ class TestGetSettings:
         get_settings.cache_clear()
         _initial_settings = get_settings()  # noqa: F841
         reloaded_settings = reload_settings()
-        # After reload, get_settings should return the new instance
         current_settings = get_settings()
         assert reloaded_settings is current_settings
 
@@ -101,3 +123,24 @@ class TestSettingsError:
         error = SettingsError("test message")
         assert isinstance(error, Exception)
         assert str(error) == "test message"
+
+
+class TestRequireCatalog:
+    """Tests for require_catalog helper."""
+
+    def test_require_catalog_passes_for_matching(self, monkeypatch):
+        """Test require_catalog passes when catalog matches."""
+        monkeypatch.delenv("CATALOG", raising=False)
+        from poor_man_lakehouse.config import require_catalog
+
+        s = Settings(_env_file=None)  # defaults to CATALOG="nessie"
+        require_catalog("nessie", connector_name="test", current_settings=s)
+
+    def test_require_catalog_raises_for_mismatch(self, monkeypatch):
+        """Test require_catalog raises when catalog doesn't match."""
+        monkeypatch.delenv("CATALOG", raising=False)
+        from poor_man_lakehouse.config import require_catalog
+
+        s = Settings(_env_file=None)  # defaults to CATALOG="nessie"
+        with pytest.raises(ValueError, match="requires 'lakekeeper' catalog"):
+            require_catalog("lakekeeper", connector_name="IbisConnection", current_settings=s)
