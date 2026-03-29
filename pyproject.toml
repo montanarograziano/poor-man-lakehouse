@@ -23,7 +23,7 @@ dependencies = [
     "marimo>=0.17.7",
     "pysail==0.4.6",
     "pyspark[connect,sql]==4.0.1",
-    "psycopg2-binary>=2.9.11",
+    "psycopg>=3.2.0",
 ]
 
 [tool.uv]
@@ -127,8 +127,8 @@ unfixable = ["F401"]
 # Enable Pyflakes `E` and `F` codes by default.
 select = [
     # default
-    "E",    # pycodestyle error
-    "F",    # flake8 error
+    "E", # pycodestyle error
+    "F", # flake8 error
     # extra
     "A",    # builtin shadowing
     "B",    # flake8-bugbear
