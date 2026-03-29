@@ -26,7 +26,7 @@ COMMON_PACKAGES: list[str] = [
     "org.apache.iceberg:iceberg-aws-bundle:1.10.1",
     "org.apache.hadoop:hadoop-aws:3.4.1",
     "org.postgresql:postgresql:42.7.10",
-    f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.107.2",
+    f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.106.0",
     f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.4.0",
 ]
 
@@ -288,6 +288,9 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
     """Builder for Spark session with Lakekeeper catalog.
 
     Uses Lakekeeper's REST catalog interface for Iceberg tables.
+    Lakekeeper vends temporary S3 credentials, so static S3 keys are NOT
+    set in Spark config — only the S3A endpoint and path-style access.
+
     Based on official Lakekeeper Spark documentation:
     https://docs.lakekeeper.io/docs/nightly/engines/#spark
     """
@@ -300,18 +303,33 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
         """
         return "lakekeeper"
 
+    def _configure_common(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        """Apply common configuration without static S3 credentials.
+
+        Lakekeeper vends temporary credentials per-table via the Iceberg REST
+        protocol. Static fs.s3a.access.key/secret.key must NOT be set or they
+        will conflict with vended credentials.
+        """
+        extensions = f"{self.ICEBERG_EXTENSIONS},{self.DELTA_EXTENSIONS}"
+        return (
+            builder.config("spark.sql.extensions", extensions)
+            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
+            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
+            .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        )
+
     def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
         catalog = self.catalog_name
-        # Lakekeeper REST catalog URI
-        lakekeeper_catalog_uri = f"{settings.LAKEKEEPER_SERVER_URI}"
 
         return (
             builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
-            .config(f"spark.sql.catalog.{catalog}.type", "rest")
-            .config(f"spark.sql.catalog.{catalog}.uri", lakekeeper_catalog_uri)
+            .config(f"spark.sql.catalog.{catalog}.catalog-impl", "org.apache.iceberg.rest.RESTCatalog")
+            .config(f"spark.sql.catalog.{catalog}.uri", settings.LAKEKEEPER_SERVER_URI)
             .config(f"spark.sql.catalog.{catalog}.warehouse", settings.LAKEKEEPER_WAREHOUSE)
-            .config(f"spark.sql.catalog.{catalog}.s3.path-style-access", "true")
-            .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+            .config(f"spark.sql.catalog.{catalog}.header.X-Iceberg-Access-Delegation", "vended-credentials")
             .config("spark.sql.defaultCatalog", catalog)
         )
 
