@@ -156,7 +156,7 @@ def sql_magic(line: str, cell: str) -> "pl.DataFrame | pl.LazyFrame | None":
         return result
 
     _display_result(result, elapsed, limit, truncated)
-    return result
+    return None
 
 
 def load_ipython_extension(ip: "InteractiveShell") -> None:
