@@ -83,7 +83,15 @@ ignore_missing_imports = true
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 include = ["src"]
-exclude = ["scripts", "docs", "notebooks", "**/__pycache__"]
+exclude = [
+    "scripts",
+    "docs",
+    "notebooks",
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.*",
+    ".venv",
+]
 reportMissingTypeStubs = false
 reportMissingImports = false
 reportPrivateImportUsage = false
