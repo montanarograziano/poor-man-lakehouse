@@ -108,7 +108,35 @@ df = spark.sql("SELECT * FROM lakekeeper.default.my_table")
 df.show()
 ```
 
-## Example 6: Dremio Query Federation
+## Example 6: Sail — PySpark Without a JVM
+
+```python
+from pysail.spark import SparkConnectServer
+from pyspark.sql import SparkSession
+
+# Start Rust-based Spark Connect engine
+server = SparkConnectServer()
+server.start()
+addr = server.listening_address
+
+spark = SparkSession.builder.remote(f"sc://{addr[0]}:{addr[1]}").getOrCreate()
+
+# Same PySpark API, no JVM
+df = spark.createDataFrame([(1, "Alice", 30), (2, "Bob", 25)], ["id", "name", "age"])
+df.createOrReplaceTempView("users")
+spark.sql("SELECT * FROM users WHERE age > 25").show()
+
+# Delta on S3 (requires AWS env vars)
+df.write.format("delta").mode("overwrite").save("s3://warehouse/sail_demo/users")
+
+spark.stop()
+server.stop()
+```
+
+!!! note
+    Sail reads S3 credentials from env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`, `AWS_ALLOW_HTTP`). Set these before starting the kernel.
+
+## Example 7: Dremio Query Federation
 
 ```python
 from poor_man_lakehouse import DremioConnection

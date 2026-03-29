@@ -20,7 +20,7 @@ Setting up a modern lakehouse stack typically requires cloud infrastructure, ven
 |   IbisConnection    PolarsClient    PyIcebergClient            |
 |   (multi-engine)    (SQL + scan)   (table management)          |
 +---------------------------------------------------------------+
-|   PySpark  |  Polars  |  DuckDB  |  Dremio (Arrow Flight)     |
+|  PySpark | Polars | DuckDB | Sail (Rust) | Dremio (Flight)    |
 +---------------------------------------------------------------+
 |                      Catalog Layer                              |
 |   Nessie  |  Lakekeeper  |  Unity Catalog  |  PostgreSQL       |
@@ -39,6 +39,7 @@ Setting up a modern lakehouse stack typically requires cloud infrastructure, ven
 | [`CatalogBrowser`](guides/catalog-browser.md) | Catalog-agnostic namespace/table browsing | Any REST catalog |
 | [`PolarsClient`](guides/polars-connector.md) | SQL queries + catalog browsing via Polars | Unity or Lakekeeper |
 | [`SparkBuilder`](guides/spark-connector.md) | Configured SparkSession per catalog type | Any |
+| [Sail](guides/connectors-overview.md#sail-pysail) | Rust-powered Spark Connect engine (no JVM) — Delta, Iceberg, S3 | Local file-based |
 | [`DremioConnection`](guides/dremio-connector.md) | Arrow Flight query federation | Nessie + Dremio |
 
 ## Quick Start
