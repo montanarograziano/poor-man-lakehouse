@@ -16,6 +16,7 @@ from pyiceberg.catalog import load_catalog
 from poor_man_lakehouse.config import settings
 
 if TYPE_CHECKING:
+    import pyarrow as pa
     from pyiceberg.catalog import Catalog
     from pyiceberg.table import Table
 
@@ -140,7 +141,7 @@ class PyIcebergClient:
         table = self.load_table(namespace, table_name)
         return pl.scan_iceberg(table)
 
-    def scan_to_arrow(self, namespace: str, table_name: str):
+    def scan_to_arrow(self, namespace: str, table_name: str) -> "pa.Table":
         """Scan an Iceberg table and return an Arrow table.
 
         Args:

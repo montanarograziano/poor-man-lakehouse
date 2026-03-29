@@ -46,7 +46,7 @@ nav:
   - Infrastructure:
       - Docker Services: guides/docker-services.md
       - Spark Cluster: guides/spark-cluster.md
-  - API Reference: reference/
+  - API Reference: reference/index.md
 
 plugins:
   - search

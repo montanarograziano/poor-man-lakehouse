@@ -12,6 +12,7 @@ from pyiceberg.catalog import load_catalog
 from poor_man_lakehouse.config import settings
 
 if TYPE_CHECKING:
+    import duckdb
     from pyiceberg.catalog import Catalog
 
 
@@ -281,7 +282,7 @@ class PolarsClient:
         catalog: str | None = None,
         namespace: str | None = None,
         exclude_tables: set[str] | None = None,
-    ):
+    ) -> "duckdb.DuckDBPyConnection":
         """Create a DuckDB connection with all Unity Catalog tables registered.
 
         Args:

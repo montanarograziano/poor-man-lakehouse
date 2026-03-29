@@ -1,6 +1,8 @@
 """Dremio connection builder for Arrow Flight queries."""
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 import duckdb
 import polars as pl
@@ -11,6 +13,9 @@ from pyarrow import flight
 from pyarrow.flight import FlightClient
 
 from poor_man_lakehouse.config import settings
+
+if TYPE_CHECKING:
+    import pandas as pd  # type: ignore[import-untyped]
 
 
 class DremioConnection:
@@ -72,7 +77,7 @@ class DremioConnection:
         """
         return self.query(query, self.client, self.headers)
 
-    def to_duckdb(self, querystring: str):
+    def to_duckdb(self, querystring: str) -> duckdb.DuckDBPyRelation:
         """Execute query and return a DuckDB relation.
 
         Args:
@@ -84,7 +89,8 @@ class DremioConnection:
         stream_reader = self.query(querystring, self.client, self.headers)
         table = stream_reader.read_all()
         my_ds = ds.dataset(source=[table])
-        return duckdb.arrow(my_ds)
+        result: duckdb.DuckDBPyRelation = duckdb.arrow(my_ds)
+        return result
 
     def to_polars(self, querystring: str) -> pl.DataFrame | pl.Series:
         """Execute query and return a Polars DataFrame or Series.
@@ -99,7 +105,7 @@ class DremioConnection:
         table = stream_reader.read_all()
         return pl.from_arrow(table)
 
-    def to_pandas(self, querystring: str):
+    def to_pandas(self, querystring: str) -> "pd.DataFrame":
         """Execute query and return a Pandas DataFrame.
 
         Args:
