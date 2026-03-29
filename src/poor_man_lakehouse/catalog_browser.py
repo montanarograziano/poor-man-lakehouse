@@ -30,10 +30,14 @@ class CatalogBrowser:
     CATALOG setting. Works with any catalog that exposes a REST API.
 
     Example:
-        >>> browser = CatalogBrowser()
+        >>> browser = (
+        ...     CatalogBrowser()
+        ... )
         >>> browser.list_namespaces()
         ['default', 'staging']
-        >>> browser.list_tables("default")
+        >>> browser.list_tables(
+        ...     "default"
+        ... )
         ['users', 'orders']
     """
 

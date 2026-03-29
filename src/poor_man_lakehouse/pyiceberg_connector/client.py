@@ -31,9 +31,18 @@ class PyIcebergClient:
     Example:
         >>> client = PyIcebergClient()
         >>> namespaces = client.list_namespaces()
-        >>> table = client.load_table("default", "users")
-        >>> df = client.scan_to_polars("default", "users")
-        >>> history = client.snapshot_history("default", "users")
+        >>> table = client.load_table(
+        ...     "default",
+        ...     "users",
+        ... )
+        >>> df = client.scan_to_polars(
+        ...     "default",
+        ...     "users",
+        ... )
+        >>> history = client.snapshot_history(
+        ...     "default",
+        ...     "users",
+        ... )
     """
 
     def __init__(
