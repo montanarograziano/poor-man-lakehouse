@@ -71,15 +71,23 @@ class SparkBuilder(ABC):
         self._app_name = app_name
 
     def _create_base_builder(self) -> SparkSession.Builder:
-        """Create a fresh SparkSession builder with common configuration."""
-        return (
-            SparkSession.builder.appName(self._app_name)
-            .master(settings.SPARK_MASTER)
-            .config("spark.driver.host", settings.SPARK_DRIVER_HOST)
-            .config("spark.driver.bindAddress", "0.0.0.0")  # noqa: S104
-            .config("spark.driver.port", settings.SPARK_DRIVER_PORT)
-            .config("spark.driver.blockManager.port", settings.SPARK_DRIVER_BLOCK_MANAGER_PORT)
-        )
+        """Create a fresh SparkSession builder with common configuration.
+
+        Driver host/port are only set for remote Spark clusters (spark://...).
+        In local[*] mode they are unnecessary and can cause connection errors.
+        """
+        builder = SparkSession.builder.appName(self._app_name).master(settings.SPARK_MASTER)
+
+        # Only configure driver networking for remote clusters
+        if not settings.SPARK_MASTER.startswith("local"):
+            builder = (
+                builder.config("spark.driver.host", settings.SPARK_DRIVER_HOST)
+                .config("spark.driver.bindAddress", "0.0.0.0")  # noqa: S104
+                .config("spark.driver.port", settings.SPARK_DRIVER_PORT)
+                .config("spark.driver.blockManager.port", settings.SPARK_DRIVER_BLOCK_MANAGER_PORT)
+            )
+
+        return builder
 
     def _get_packages(self) -> list[str]:
         """Get the list of Maven packages to include.
