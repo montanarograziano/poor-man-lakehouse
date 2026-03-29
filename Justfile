@@ -20,7 +20,8 @@ lint:
     {{just_executable()}} needs uv
     uv run ruff format src tests
     uv run ruff check src tests --fix --unsafe-fixes
-    uv run mypy src tests
+    uv run mypy src
+    uv run pyright src
 
 # Run all tests
 test:

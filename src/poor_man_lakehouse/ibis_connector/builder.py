@@ -111,15 +111,18 @@ class IbisConnection:
         logger.debug("Initializing DuckDB connection with Lakekeeper catalog...")
         con = ibis.duckdb.connect(database=":memory:", read_only=False, extensions=["iceberg"])
 
-        # Configure S3/MinIO access for reading Iceberg data files
+        # Configure S3/MinIO access for reading and writing Iceberg data files
+        endpoint = settings.AWS_ENDPOINT_URL.replace("https://", "").replace("http://", "")
+        use_ssl = "true" if settings.AWS_ENDPOINT_URL.startswith("https://") else "false"
         con.raw_sql(f"""
             CREATE OR REPLACE SECRET s3_secret (
                 TYPE S3,
                 KEY_ID '{settings.AWS_ACCESS_KEY_ID}',
                 SECRET '{settings.AWS_SECRET_ACCESS_KEY}',
-                ENDPOINT '{settings.AWS_ENDPOINT_URL.replace("http://", "")}',
+                REGION '{settings.AWS_DEFAULT_REGION}',
+                ENDPOINT '{endpoint}',
                 URL_STYLE 'path',
-                USE_SSL false
+                USE_SSL {use_ssl}
             );
         """)
 

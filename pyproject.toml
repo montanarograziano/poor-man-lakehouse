@@ -40,6 +40,7 @@ dev = [
     "deptry>=0.23.0",
     "ipykernel>=6.29.5",
     "mypy>=1.16.0",
+    "pyright>=1.1.390",
     "prek>=0.2.12",
     "pytest>=8.4.0",
     "pytest-cov>=6.0.0",
@@ -77,6 +78,15 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "ibis.*"
 ignore_missing_imports = true
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = ["src"]
+exclude = ["scripts", "docs", "notebooks", "**/__pycache__"]
+reportMissingTypeStubs = false
+reportMissingImports = false
+reportPrivateImportUsage = false
 
 #### RUFF
 [tool.ruff]

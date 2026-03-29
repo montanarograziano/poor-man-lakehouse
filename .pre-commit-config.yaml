@@ -32,6 +32,12 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: pyright
+        name: pyright
+        entry: uv run pyright src
+        language: system
+        types: [python]
+        pass_filenames: false
       - id: detect-secrets
         name: detect-secrets
         entry: git diff --staged --name-only -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
