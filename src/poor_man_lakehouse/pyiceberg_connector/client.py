@@ -123,7 +123,7 @@ class PyIcebergClient:
             {
                 "snapshot_id": snap.snapshot_id,
                 "timestamp_ms": snap.timestamp_ms,
-                "summary": dict(snap.summary) if snap.summary else {},
+                "summary": snap.summary.model_dump() if snap.summary else {},
             }
             for snap in (table.metadata.snapshots or [])
         ]
