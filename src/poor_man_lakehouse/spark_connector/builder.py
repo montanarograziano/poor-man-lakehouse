@@ -38,6 +38,7 @@ class CatalogType(str, Enum):
     UNITY_CATALOG = "unity_catalog"
     NESSIE = "nessie"
     LAKEKEEPER = "lakekeeper"
+    GLUE = "glue"
 
 
 class SparkBuilder(ABC):
@@ -348,11 +349,69 @@ class LakekeeperCatalogSparkBuilder(SparkBuilder):
         return spark
 
 
+class GlueCatalogSparkBuilder(SparkBuilder):
+    """Builder for Spark session with AWS Glue Catalog for Iceberg tables.
+
+    Uses AWS Glue as the Iceberg catalog backend. Credentials are resolved via
+    the AWS default credential chain (environment variables, ~/.aws/credentials,
+    IAM roles) — no static S3 keys are injected into Spark config.
+
+    Credential resolution order:
+        1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+        2. AWS credentials file (~/.aws/credentials)
+        3. IAM instance profile / role (EC2, ECS, Lambda)
+        4. AWS SSO / STS assume-role
+
+    Requires:
+        - Valid AWS credentials with Glue and S3 permissions
+        - An S3 bucket for the warehouse (BUCKET_NAME setting)
+        - AWS_DEFAULT_REGION set to the Glue catalog's region
+    """
+
+    def _configure_common(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        """Apply common configuration without static S3 credentials.
+
+        AWS Glue uses the default credential chain — static fs.s3a keys are not
+        set so the AWS SDK can resolve credentials automatically from the
+        environment, credentials file, or IAM role.
+        """
+        extensions = f"{self.ICEBERG_EXTENSIONS},{self.DELTA_EXTENSIONS}"
+        return (
+            builder.config("spark.sql.extensions", extensions)
+            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        )
+
+    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        catalog = self.catalog_name
+
+        builder = (
+            builder.config(f"spark.sql.catalog.{catalog}", "org.apache.iceberg.spark.SparkCatalog")
+            .config(f"spark.sql.catalog.{catalog}.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+            .config(f"spark.sql.catalog.{catalog}.warehouse", settings.WAREHOUSE_BUCKET)
+            .config(f"spark.sql.catalog.{catalog}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+            .config("spark.sql.defaultCatalog", catalog)
+        )
+
+        if settings.GLUE_CATALOG_ID:
+            builder = builder.config(f"spark.sql.catalog.{catalog}.glue.id", settings.GLUE_CATALOG_ID)
+
+        return builder
+
+    def get_spark_session(self) -> SparkSession:
+        """Get a Spark session configured for AWS Glue Catalog."""
+        spark = super().get_spark_session()
+        self._ensure_default_database(spark, self.catalog_name)
+        return spark
+
+
 _CATALOG_BUILDERS: dict[CatalogType, type[SparkBuilder]] = {
     CatalogType.POSTGRES: PostgresCatalogSparkBuilder,
     CatalogType.UNITY_CATALOG: DeltaUnityCatalogSparkBuilder,
     CatalogType.NESSIE: NessieCatalogSparkBuilder,
     CatalogType.LAKEKEEPER: LakekeeperCatalogSparkBuilder,
+    CatalogType.GLUE: GlueCatalogSparkBuilder,
 }
 
 

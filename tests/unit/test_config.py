@@ -70,6 +70,39 @@ class TestSettings:
 
         assert test_settings.ICEBERG_STORAGE_OPTIONS["warehouse"] == "my-warehouse"
 
+    def test_configure_data_path_populates_iceberg_options_glue(self):
+        """Test _configure_data_path populates Iceberg options for Glue catalog."""
+        test_settings = Settings(
+            _env_file=None,
+            AWS_DEFAULT_REGION="us-east-1",
+            CATALOG="glue",
+            BUCKET_NAME="my-data-lake",
+        )
+
+        assert test_settings.ICEBERG_STORAGE_OPTIONS["s3.region"] == "us-east-1"
+        assert test_settings.ICEBERG_STORAGE_OPTIONS["warehouse"] == "s3://my-data-lake/"
+        # Glue options should NOT contain static S3 credentials
+        assert "s3.access-key-id" not in test_settings.ICEBERG_STORAGE_OPTIONS
+        assert "s3.secret-access-key" not in test_settings.ICEBERG_STORAGE_OPTIONS
+        assert "s3.endpoint" not in test_settings.ICEBERG_STORAGE_OPTIONS
+
+    def test_configure_data_path_populates_iceberg_options_glue_with_catalog_id(self):
+        """Test _configure_data_path includes glue.id when GLUE_CATALOG_ID is set."""
+        test_settings = Settings(
+            _env_file=None,
+            CATALOG="glue",
+            GLUE_CATALOG_ID="123456789012",
+            BUCKET_NAME="my-data-lake",
+        )
+
+        assert test_settings.ICEBERG_STORAGE_OPTIONS["glue.id"] == "123456789012"
+
+    def test_glue_catalog_id_default_empty(self, monkeypatch):
+        """Test GLUE_CATALOG_ID defaults to empty string."""
+        monkeypatch.delenv("GLUE_CATALOG_ID", raising=False)
+        test_settings = Settings(_env_file=None)
+        assert test_settings.GLUE_CATALOG_ID == ""
+
     def test_warehouse_bucket_computed_from_bucket_name(self):
         """Test WAREHOUSE_BUCKET is computed from BUCKET_NAME at instance time."""
         test_settings = Settings(_env_file=None, BUCKET_NAME="my-bucket")

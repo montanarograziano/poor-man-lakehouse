@@ -8,6 +8,7 @@ from poor_man_lakehouse.spark_connector.builder import (
     COMMON_PACKAGES,
     CatalogType,
     DeltaUnityCatalogSparkBuilder,
+    GlueCatalogSparkBuilder,
     LakekeeperCatalogSparkBuilder,
     NessieCatalogSparkBuilder,
     PostgresCatalogSparkBuilder,
@@ -24,6 +25,7 @@ class TestCatalogType:
         assert CatalogType.UNITY_CATALOG.value == "unity_catalog"
         assert CatalogType.NESSIE.value == "nessie"
         assert CatalogType.LAKEKEEPER.value == "lakekeeper"
+        assert CatalogType.GLUE.value == "glue"
 
     def test_catalog_type_from_string(self):
         """Test CatalogType can be created from string."""
@@ -63,6 +65,16 @@ class TestGetSparkBuilder:
         """Test get_spark_builder returns LakekeeperCatalogSparkBuilder."""
         builder = get_spark_builder(CatalogType.LAKEKEEPER)
         assert isinstance(builder, LakekeeperCatalogSparkBuilder)
+
+    def test_returns_glue_builder(self):
+        """Test get_spark_builder returns GlueCatalogSparkBuilder."""
+        builder = get_spark_builder(CatalogType.GLUE)
+        assert isinstance(builder, GlueCatalogSparkBuilder)
+
+    def test_returns_glue_builder_from_string(self):
+        """Test get_spark_builder accepts 'glue' string input."""
+        builder = get_spark_builder("glue")
+        assert isinstance(builder, GlueCatalogSparkBuilder)
 
     def test_raises_for_invalid_catalog_string(self):
         """Test get_spark_builder raises ValueError for invalid string."""
@@ -204,3 +216,73 @@ class TestCommonPackages:
     def test_common_packages_include_postgresql(self):
         """Test COMMON_PACKAGES includes PostgreSQL driver."""
         assert any("postgresql" in pkg for pkg in COMMON_PACKAGES)
+
+
+class TestGlueCatalogSparkBuilder:
+    """Tests for GlueCatalogSparkBuilder."""
+
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
+    def test_configure_catalog_sets_glue_config(self, mock_settings):
+        """Test _configure_catalog sets Glue catalog configuration."""
+        mock_settings.CATALOG_NAME = "glue"
+        mock_settings.WAREHOUSE_BUCKET = "s3://my-warehouse/"
+        mock_settings.GLUE_CATALOG_ID = ""
+
+        builder = GlueCatalogSparkBuilder()
+        mock_builder = MagicMock()
+        mock_builder.config.return_value = mock_builder
+
+        builder._configure_catalog(mock_builder)
+
+        config_calls = [str(call) for call in mock_builder.config.call_args_list]
+        assert any("GlueCatalog" in str(call) for call in config_calls)
+        assert any("S3FileIO" in str(call) for call in config_calls)
+        assert any("s3://my-warehouse/" in str(call) for call in config_calls)
+
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
+    def test_configure_catalog_sets_glue_id_when_provided(self, mock_settings):
+        """Test _configure_catalog sets glue.id when GLUE_CATALOG_ID is set."""
+        mock_settings.CATALOG_NAME = "glue"
+        mock_settings.WAREHOUSE_BUCKET = "s3://my-warehouse/"
+        mock_settings.GLUE_CATALOG_ID = "123456789012"
+
+        builder = GlueCatalogSparkBuilder()
+        mock_builder = MagicMock()
+        mock_builder.config.return_value = mock_builder
+
+        builder._configure_catalog(mock_builder)
+
+        config_calls = [str(call) for call in mock_builder.config.call_args_list]
+        assert any("glue.id" in str(call) for call in config_calls)
+        assert any("123456789012" in str(call) for call in config_calls)
+
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
+    def test_configure_catalog_skips_glue_id_when_empty(self, mock_settings):
+        """Test _configure_catalog does not set glue.id when GLUE_CATALOG_ID is empty."""
+        mock_settings.CATALOG_NAME = "glue"
+        mock_settings.WAREHOUSE_BUCKET = "s3://my-warehouse/"
+        mock_settings.GLUE_CATALOG_ID = ""
+
+        builder = GlueCatalogSparkBuilder()
+        mock_builder = MagicMock()
+        mock_builder.config.return_value = mock_builder
+
+        builder._configure_catalog(mock_builder)
+
+        config_calls = [str(call) for call in mock_builder.config.call_args_list]
+        assert not any("glue.id" in str(call) for call in config_calls)
+
+    @patch("poor_man_lakehouse.spark_connector.builder.settings")
+    def test_configure_common_skips_static_s3_keys(self, mock_settings):
+        """Test _configure_common does not set static S3 access/secret keys."""
+        mock_settings.AWS_DEFAULT_REGION = "us-east-1"
+
+        builder = GlueCatalogSparkBuilder()
+        mock_builder = MagicMock()
+        mock_builder.config.return_value = mock_builder
+
+        builder._configure_common(mock_builder)
+
+        config_calls = [str(call) for call in mock_builder.config.call_args_list]
+        assert not any("fs.s3a.access.key" in str(call) for call in config_calls)
+        assert not any("fs.s3a.secret.key" in str(call) for call in config_calls)

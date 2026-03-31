@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Poor Man's Lakehouse is a composable, local OSS lakehouse with multiple catalog backends (Nessie, Lakekeeper, Unity Catalog, PostgreSQL), compute engines (PySpark, Polars, DuckDB), and table formats (Iceberg, Delta). All storage goes through MinIO (S3-compatible). Python 3.12+.
+Poor Man's Lakehouse is a composable, local OSS lakehouse with multiple catalog backends (Nessie, Lakekeeper, Unity Catalog, PostgreSQL, AWS Glue), compute engines (PySpark, Polars, DuckDB), and table formats (Iceberg, Delta). Local storage goes through MinIO (S3-compatible); AWS Glue uses real S3. Python 3.12+.
 
 ## Commands
 
@@ -29,8 +29,8 @@ just down               # Stop all
 
 The package lives under `src/poor_man_lakehouse/` with four connector subpackages:
 
-- **`spark_connector/`** — SparkSession builders for each catalog type. Uses an abstract `SparkBuilder` base class with subclasses per catalog (`PostgresCatalogSparkBuilder`, `NessieCatalogSparkBuilder`, `LakekeeperCatalogSparkBuilder`, `DeltaUnityCatalogSparkBuilder`). Factory function `get_spark_builder(catalog_type)` selects the right one based on `CatalogType` enum or the `CATALOG` env var.
-- **`ibis_connector/`** — `IbisConnection` provides lazy multi-engine access (PySpark, Polars, DuckDB) through Ibis. **Requires Lakekeeper catalog.** Each engine is a `@cached_property` that only initializes when accessed. Uses `@overload` on `get_connection()` so the return type narrows to the specific backend (`DuckDBBackend`, `PolarsBackend`, `PySparkBackend`).
+- **`spark_connector/`** — SparkSession builders for each catalog type. Uses an abstract `SparkBuilder` base class with subclasses per catalog (`PostgresCatalogSparkBuilder`, `NessieCatalogSparkBuilder`, `LakekeeperCatalogSparkBuilder`, `DeltaUnityCatalogSparkBuilder`, `GlueCatalogSparkBuilder`). Factory function `get_spark_builder(catalog_type)` selects the right one based on `CatalogType` enum or the `CATALOG` env var.
+- **`ibis_connector/`** — `IbisConnection` provides lazy multi-engine access (PySpark, Polars, DuckDB) through Ibis. **Requires Lakekeeper or Glue catalog.** Each engine is a `@cached_property` that only initializes when accessed. Uses `@overload` on `get_connection()` so the return type narrows to the specific backend (`DuckDBBackend`, `PolarsBackend`, `PySparkBackend`).
 - **`polars_connector/`** — `PolarsClient` for Unity Catalog with `%%sql` Jupyter magic. Reads Delta tables via PyIceberg, provides catalog browsing, SQL (via sqlglot parsing), and lazy evaluation.
 - **`dremio_connector/`** — `DremioConnection` for Arrow Flight queries against Dremio. Output methods: `to_polars()`, `to_duckdb()`, `to_pandas()`, `to_arrow()`.
 
@@ -50,6 +50,7 @@ The package lives under `src/poor_man_lakehouse/` with four connector subpackage
 ## Key Constraints
 
 - Only one catalog should run at a time — they share PostgreSQL and MinIO
-- `IbisConnection` only works with `CATALOG=lakekeeper`
+- `IbisConnection` works with `CATALOG=lakekeeper` or `CATALOG=glue`
+- AWS Glue catalog is cloud-only (no Docker services) — requires valid AWS credentials and an S3 bucket
 - PySpark imports are deferred (lazy) to avoid JVM startup at import time
 - The `spark_connector/` directory was renamed from `spark/` — all imports must use `spark_connector`

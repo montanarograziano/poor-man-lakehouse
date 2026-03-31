@@ -4,10 +4,10 @@ A composable, local Open Source Lakehouse implementation using modern data engin
 
 ## Features
 
-- **Multiple Catalog Support**: Nessie, Lakekeeper, Unity Catalog, or PostgreSQL-backed Iceberg catalog
+- **Multiple Catalog Support**: Nessie, Lakekeeper, Unity Catalog, PostgreSQL-backed Iceberg catalog, or AWS Glue
 - **Multi-Engine Access**: PySpark, Polars, and DuckDB through a unified Ibis interface
 - **Table Formats**: Apache Iceberg (primary), Delta Lake support
-- **Object Storage**: MinIO (S3-compatible) for local development
+- **Object Storage**: MinIO (S3-compatible) for local development, real S3 for AWS Glue
 - **Query Federation**: Dremio integration for cross-source queries via Arrow Flight
 - **Lazy Initialization**: Engines only start when accessed, reducing startup overhead
 
@@ -23,7 +23,7 @@ A composable, local Open Source Lakehouse implementation using modern data engin
 ├──────────────┴──────────┴──────────┴──────────┴─────────────────┤
 │                      Catalog Layer                               │
 │     ┌──────────┬────────────┬─────────────┬──────────┐         │
-│     │  Nessie  │ Lakekeeper │ Unity Cat.  │ Postgres │         │
+│     │  Nessie  │ Lakekeeper │ Unity Cat.  │ Postgres │  Glue  ││
 ├─────┴──────────┴────────────┴─────────────┴──────────┴──────────┤
 │                      Storage Layer                               │
 │                    MinIO (S3-compatible)                         │
@@ -57,7 +57,7 @@ just install
 cp .env.example .env
 
 # Edit .env to set your preferred catalog
-# CATALOG="nessie"      # Options: nessie, lakekeeper, postgres, unity_catalog
+# CATALOG="nessie"      # Options: nessie, lakekeeper, postgres, unity_catalog, glue
 
 # Add Docker service names to /etc/hosts for local Python development
 # This allows the same .env to work both inside Docker and locally
@@ -136,7 +136,7 @@ Each catalog maintains its own metadata about tables in the warehouse:
 
 | Variable                | Default                 | Description                                                         |
 | ----------------------- | ----------------------- | ------------------------------------------------------------------- |
-| `CATALOG`               | `nessie`                | Active catalog: `nessie`, `lakekeeper`, `postgres`, `unity_catalog` |
+| `CATALOG`               | `nessie`                | Active catalog: `nessie`, `lakekeeper`, `postgres`, `unity_catalog`, `glue` |
 | `AWS_ACCESS_KEY_ID`     | `minioadmin`            | MinIO access key                                                    |
 | `AWS_SECRET_ACCESS_KEY` | `miniopassword`         | MinIO secret key                                                    |
 | `AWS_ENDPOINT_URL`      | `http://localhost:9000` | S3 endpoint                                                         |
@@ -154,6 +154,27 @@ Ensure your `.env` `CATALOG` setting matches the Docker profile you're using:
 | `lakekeeper`  | `CATALOG=lakekeeper` |
 | `dremio`      | `CATALOG=nessie`     |
 | *(core only)* | `CATALOG=postgres`   |
+
+### AWS Glue Catalog (Cloud)
+
+AWS Glue requires no Docker services — it connects directly to the AWS Glue service.
+
+```bash
+# .env settings for Glue
+CATALOG="glue"
+CATALOG_NAME="glue"
+AWS_DEFAULT_REGION="us-east-1"     # Must match your Glue catalog's region
+BUCKET_NAME="my-data-lake"         # Your S3 bucket for Iceberg data
+# GLUE_CATALOG_ID="123456789012"   # Optional: for cross-account access
+```
+
+**Credential resolution** (in order):
+1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+2. AWS credentials file (`~/.aws/credentials`)
+3. IAM instance profile / role (EC2, ECS, Lambda)
+4. AWS SSO / STS assume-role
+
+Both Spark and DuckDB (via Ibis) can read and write Iceberg tables through the Glue catalog.
 
 ## Usage
 
@@ -194,7 +215,7 @@ history = client.snapshot_history("default", "users")
 df = client.scan_to_polars("default", "users")
 ```
 
-### Multi-Engine with Ibis (Requires Lakekeeper)
+### Multi-Engine with Ibis (Requires Lakekeeper or Glue)
 
 ```python
 from poor_man_lakehouse import IbisConnection
@@ -311,6 +332,7 @@ just up-clean nessie
 | **Lakekeeper**    | Stable       | Simple REST catalog, good for production                   |
 | **PostgreSQL**    | Stable       | JDBC-based, simplest setup                                 |
 | **Unity Catalog** | Experimental | Requires additional configuration                          |
+| **AWS Glue**      | Stable       | Cloud-only, no Docker services, requires AWS credentials   |
 
 ## Roadmap
 
