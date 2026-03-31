@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "lakehouse_db"
 
     # Catalog settings
-    CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie", "lakekeeper", "postgres"
+    CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie", "lakekeeper", "postgres", "glue"
     CATALOG_URI: str = "http://localhost:8080"
     CATALOG_NAME: str = "nessie"
     CATALOG_DEFAULT_SCHEMA: str = "default"
@@ -69,6 +69,9 @@ class Settings(BaseSettings):
 
     # Unity Catalog Configuration
     UNITY_CATALOG_URI: str = "http://unity_catalog:8080/"
+
+    # AWS Glue Catalog Configuration
+    GLUE_CATALOG_ID: str = ""  # AWS account ID for cross-account access; empty = default account
 
     # Dremio settings
     DREMIO_SERVER_URI: str = "http://dremio:9047"
@@ -127,15 +130,23 @@ class Settings(BaseSettings):
             "aws_conditional_put": "etag",
         }
 
-        self.ICEBERG_STORAGE_OPTIONS = {
-            "s3.endpoint": self.AWS_ENDPOINT_URL,
-            "s3.access-key-id": self.AWS_ACCESS_KEY_ID,
-            "s3.secret-access-key": self.AWS_SECRET_ACCESS_KEY,
-            "s3.region": self.AWS_DEFAULT_REGION,
-            "warehouse": self.LAKEKEEPER_WAREHOUSE
-            if self.CATALOG == "lakekeeper"
-            else self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
-        }
+        if self.CATALOG == "glue":
+            self.ICEBERG_STORAGE_OPTIONS = {
+                "s3.region": self.AWS_DEFAULT_REGION,
+                "warehouse": self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
+            }
+            if self.GLUE_CATALOG_ID:
+                self.ICEBERG_STORAGE_OPTIONS["glue.id"] = self.GLUE_CATALOG_ID
+        else:
+            self.ICEBERG_STORAGE_OPTIONS = {
+                "s3.endpoint": self.AWS_ENDPOINT_URL,
+                "s3.access-key-id": self.AWS_ACCESS_KEY_ID,
+                "s3.secret-access-key": self.AWS_SECRET_ACCESS_KEY,
+                "s3.region": self.AWS_DEFAULT_REGION,
+                "warehouse": self.LAKEKEEPER_WAREHOUSE
+                if self.CATALOG == "lakekeeper"
+                else self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
+            }
 
     def _setup_logger(self) -> None:
         """Configure loguru logger with stderr and file handlers."""

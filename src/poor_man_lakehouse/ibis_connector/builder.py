@@ -1,12 +1,13 @@
-"""Ibis connection builder for multi-engine data access via Lakekeeper catalog.
+"""Ibis connection builder for multi-engine data access via Lakekeeper or Glue catalog.
 
 This module provides a unified interface for accessing data through multiple
 compute engines (PySpark, Polars, DuckDB) using Ibis as the abstraction layer.
-All engines connect to the Lakekeeper REST catalog for Iceberg table management.
+Engines connect to either the Lakekeeper REST catalog or AWS Glue Catalog for
+Iceberg table management.
 
-- PySpark: Connects to Lakekeeper via Spark's REST catalog integration.
-- DuckDB: Attaches the Lakekeeper catalog via the DuckDB Iceberg extension.
-- Polars: Uses PyIceberg as an intermediary (no native Lakekeeper support).
+- PySpark: Connects via Spark's catalog integration (Lakekeeper REST or Glue).
+- DuckDB: Attaches the catalog via the DuckDB Iceberg extension.
+- Polars: Uses PyIceberg as an intermediary (no native catalog support).
 
 Connections are lazily initialized - engines are only started when first accessed.
 """
@@ -39,26 +40,31 @@ _SQL_ENGINES: set[str] = {"pyspark", "duckdb"}
 _WRITE_MODES: set[str] = {"append", "overwrite"}
 
 
+_SUPPORTED_CATALOGS: set[str] = {"lakekeeper", "glue"}
+
+
 class IbisConnection:
-    """Multi-engine connection manager using Ibis with Lakekeeper catalog.
+    """Multi-engine connection manager using Ibis with Lakekeeper or Glue catalog.
 
     Provides lazy access to PySpark, Polars, and DuckDB engines through a common
-    Ibis interface. All SQL engines (Spark, DuckDB) connect directly to the
-    Lakekeeper REST catalog. Polars uses PyIceberg as an intermediary since it
-    doesn't support Lakekeeper natively.
+    Ibis interface. SQL engines (Spark, DuckDB) connect directly to the configured
+    catalog (Lakekeeper REST or AWS Glue). Polars uses PyIceberg as an intermediary.
+
+    Supported catalogs:
+        - **lakekeeper**: Local Lakekeeper REST catalog (default).
+        - **glue**: AWS Glue Catalog. Credentials are resolved via the AWS default
+          credential chain (env vars > ~/.aws/credentials > IAM role).
 
     Raises:
-        ValueError: If the configured catalog is not 'lakekeeper'.
+        ValueError: If the configured catalog is not 'lakekeeper' or 'glue'.
 
     Example:
         >>> conn = (
         ...     IbisConnection()
         ... )
-        >>> # Spark session only starts when this is called:
         >>> spark_conn = conn.get_connection(
         ...     "pyspark"
         ... )
-        >>> # DuckDB connects to Lakekeeper catalog:
         >>> duck_conn = conn.get_connection(
         ...     "duckdb"
         ... )
@@ -67,20 +73,26 @@ class IbisConnection:
     def __init__(self) -> None:
         """Initialize the connection manager.
 
-        Validates that the configured catalog is Lakekeeper and prepares
+        Validates that the configured catalog is supported and prepares
         connection parameters.
 
         Raises:
-            ValueError: If settings.CATALOG is not 'lakekeeper'.
+            ValueError: If settings.CATALOG is not 'lakekeeper' or 'glue'.
         """
-        if settings.CATALOG.lower() != "lakekeeper":
+        catalog = settings.CATALOG.lower()
+        if catalog not in _SUPPORTED_CATALOGS:
             raise ValueError(
-                f"Only the Lakekeeper catalog is supported by IbisConnection. "
-                f"Got: '{settings.CATALOG}'. Set CATALOG=lakekeeper in your environment."
+                f"IbisConnection supports catalogs: {_SUPPORTED_CATALOGS}. "
+                f"Got: '{settings.CATALOG}'. Set CATALOG=lakekeeper or CATALOG=glue in your environment."
             )
+        self._catalog_type = catalog
         self._catalog_name = settings.CATALOG_NAME
-        self._lakekeeper_endpoint = f"{settings.LAKEKEEPER_SERVER_URI}"
-        logger.debug(f"IbisConnection initialized with Lakekeeper catalog at {self._lakekeeper_endpoint}")
+        if catalog == "lakekeeper":
+            self._lakekeeper_endpoint = f"{settings.LAKEKEEPER_SERVER_URI}"
+            logger.debug(f"IbisConnection initialized with Lakekeeper catalog at {self._lakekeeper_endpoint}")
+        else:
+            self._lakekeeper_endpoint = ""
+            logger.debug(f"IbisConnection initialized with Glue catalog (region={settings.AWS_DEFAULT_REGION})")
 
     @cached_property
     def _pyspark_connection(self) -> PySparkBackend:
@@ -103,11 +115,17 @@ class IbisConnection:
 
     @cached_property
     def _duckdb_connection(self) -> DuckDBBackend:
-        """Lazily initialize DuckDB Ibis connection with Lakekeeper catalog attached.
+        """Lazily initialize DuckDB Ibis connection with Iceberg catalog attached.
 
-        Configures S3/MinIO access and attaches the Lakekeeper REST catalog
-        via DuckDB's Iceberg extension.
+        For Lakekeeper: configures S3/MinIO access and attaches the REST catalog.
+        For Glue: uses the AWS default credential chain and attaches via Glue catalog type.
         """
+        if self._catalog_type == "glue":
+            return self._init_duckdb_glue()
+        return self._init_duckdb_lakekeeper()
+
+    def _init_duckdb_lakekeeper(self) -> DuckDBBackend:
+        """Initialize DuckDB with Lakekeeper REST catalog."""
         logger.debug("Initializing DuckDB connection with Lakekeeper catalog...")
         con = ibis.duckdb.connect(database=":memory:", read_only=False, extensions=["iceberg"])
 
@@ -138,18 +156,65 @@ class IbisConnection:
         logger.debug(f"DuckDB attached to Lakekeeper catalog as '{self._catalog_name}'")
         return con
 
+    def _init_duckdb_glue(self) -> DuckDBBackend:
+        """Initialize DuckDB with AWS Glue Catalog.
+
+        Credentials are resolved via the AWS default credential chain:
+            1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+            2. AWS credentials file (~/.aws/credentials)
+            3. IAM instance profile / role
+        """
+        logger.debug("Initializing DuckDB connection with Glue catalog...")
+        con = ibis.duckdb.connect(database=":memory:", read_only=False, extensions=["iceberg"])
+
+        # Configure S3 access via credential chain provider
+        con.raw_sql(f"""
+            CREATE OR REPLACE SECRET s3_secret (
+                TYPE S3,
+                PROVIDER credential_chain,
+                REGION '{settings.AWS_DEFAULT_REGION}'
+            );
+        """)
+
+        # Attach Glue catalog via the Iceberg extension
+        glue_catalog_id_clause = ""
+        if settings.GLUE_CATALOG_ID:
+            glue_catalog_id_clause = f",\n                CATALOG_ID '{settings.GLUE_CATALOG_ID}'"
+        con.raw_sql(f"""
+            ATTACH OR REPLACE '{settings.BUCKET_NAME}' AS {self._catalog_name} (
+                TYPE iceberg,
+                CATALOG_TYPE glue,
+                REGION '{settings.AWS_DEFAULT_REGION}'{glue_catalog_id_clause}
+            );
+        """)
+
+        logger.debug(f"DuckDB attached to Glue catalog as '{self._catalog_name}'")
+        return con
+
     @cached_property
     def pyiceberg_catalog(self) -> Catalog:
-        """Lazily initialize PyIceberg catalog connected to Lakekeeper.
+        """Lazily initialize PyIceberg catalog.
 
-        Used by the Polars engine since Polars doesn't support Lakekeeper natively.
-        PyIceberg provides the bridge between Polars and the Lakekeeper catalog.
+        For Lakekeeper: connects to the REST catalog endpoint.
+        For Glue: connects via the PyIceberg Glue catalog implementation.
+
+        Used by the Polars engine since Polars doesn't support catalogs natively.
         """
-        catalog_config = settings.ICEBERG_STORAGE_OPTIONS | {
-            "type": "rest",
-            "uri": settings.LAKEKEEPER_SERVER_URI,
-        }
-        logger.debug(f"Initializing PyIceberg catalog '{self._catalog_name}' at {settings.LAKEKEEPER_SERVER_URI}")
+        if self._catalog_type == "glue":
+            catalog_config: dict[str, str] = {
+                "type": "glue",
+                "s3.region": settings.AWS_DEFAULT_REGION,
+                "warehouse": settings.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
+            }
+            if settings.GLUE_CATALOG_ID:
+                catalog_config["glue.id"] = settings.GLUE_CATALOG_ID
+            logger.debug(f"Initializing PyIceberg Glue catalog '{self._catalog_name}'")
+        else:
+            catalog_config = settings.ICEBERG_STORAGE_OPTIONS | {
+                "type": "rest",
+                "uri": settings.LAKEKEEPER_SERVER_URI,
+            }
+            logger.debug(f"Initializing PyIceberg catalog '{self._catalog_name}' at {settings.LAKEKEEPER_SERVER_URI}")
         return load_catalog(self._catalog_name, **catalog_config)
 
     @overload
