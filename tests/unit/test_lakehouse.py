@@ -321,9 +321,7 @@ class TestLakehouseConnectionIbis:
 
             result = conn.ibis_polars("default", "users")
 
-            mock_polars_backend.create_table.assert_called_once_with(
-                "default.users", mock_lazyframe, overwrite=True
-            )
+            mock_polars_backend.create_table.assert_called_once_with("default.users", mock_lazyframe, overwrite=True)
             assert result is mock_polars_backend
 
 
