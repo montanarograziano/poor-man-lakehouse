@@ -8,8 +8,6 @@
 #   docker compose up                           # Core only (PostgreSQL JDBC catalog)
 #   docker compose --profile nessie up          # Core + Nessie catalog
 #   docker compose --profile lakekeeper up      # Core + Lakekeeper catalog
-#   docker compose --profile dremio up          # Core + Nessie + Dremio
-#   docker compose --profile unity up           # Core + Unity Catalog
 #   docker compose --profile full up            # All services (TESTING ONLY)
 #
 # Add Spark cluster to your chosen catalog:
@@ -71,11 +69,11 @@ services:
       retries: 5
 
   # =============================================================================
-  # NESSIE CATALOG (profile: nessie, dremio, full)
+  # NESSIE CATALOG (profile: nessie, full)
   # =============================================================================
 
   nessie:
-    profiles: ["nessie", "dremio", "full"]
+    profiles: ["nessie", "full"]
     image: ghcr.io/projectnessie/nessie:0.107.2-java
     container_name: nessie
     depends_on:
@@ -197,90 +195,6 @@ services:
     volumes:
       - ./scripts/init_lakekeeper_warehouse.sh:/usr/local/bin/init_lakekeeper_warehouse.sh
     entrypoint: /usr/local/bin/init_lakekeeper_warehouse.sh
-
-  # =============================================================================
-  # DREMIO (profile: dremio, full) - requires nessie
-  # =============================================================================
-
-  # dremio:
-  #   profiles: ["dremio", "full"]
-  #   platform: linux/x86_64
-  #   image: dremio/dremio-oss:latest
-  #   ports:
-  #     - "9047:9047"
-  #     - "31010:31010"
-  #     - "32010:32010"
-  #   container_name: dremio
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #     nessie:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9047"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
-  #   environment:
-  #     DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-  #     DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-  #     DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
-  #   volumes:
-  #     - ./configs/dremio/data:/opt/dremio/data
-  #     - ./configs/dremio/conf/dremio.conf:/opt/dremio/conf/dremio.conf
-  #     - ./configs/dremio/logs:/opt/dremio/logs
-  #     - ./configs/dremio/local:/localFiles
-  #     - ./configs/dremio/plugins:/opt/dremio/plugins
-
-  # dremio-init-catalog:
-    # profiles: ["dremio", "full"]
-    # image: alpine/curl:latest
-    # container_name: dremio-init-catalog
-    # depends_on:
-    #   dremio:
-    #     condition: service_healthy
-    #   nessie:
-    #     condition: service_healthy
-    #   minio:
-    #     condition: service_healthy
-    # env_file: .env
-    # environment:
-    #   DREMIO_ROOT_EMAIL: ${DREMIO_ROOT_EMAIL:-admin@example.com}
-    #   DREMIO_ROOT_PASSWORD: ${DREMIO_ROOT_PASSWORD:-dremio123}
-    #   DREMIO_USERNAME: ${DREMIO_USERNAME:-dremio}
-    #   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-    #   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-    #   AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://minio:9000}
-    #   NESSIE_DREMIO_SERVER_URI: ${NESSIE_DREMIO_SERVER_URI:-http://nessie:19120/api/v2}
-    # volumes:
-    #   - ./scripts/init_dremio.sh:/usr/local/bin/init_dremio.sh
-    # entrypoint: /usr/local/bin/init_dremio.sh
-
-  # =============================================================================
-  # UNITY CATALOG (profile: unity, full)
-  # =============================================================================
-
-  unity_catalog:
-    profiles: ["unity", "full"]
-    image: unitycatalog/unitycatalog:latest
-    ports:
-      - "8080:8080"
-    environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-miniopassword}
-      AWS_REGION: ${AWS_DEFAULT_REGION:-eu-central-1}
-    volumes:
-      - ./configs/unity_catalog/etc/conf:/opt/unitycatalog/etc/conf
-      - ./configs/unity_catalog/etc/data:/opt/unitycatalog/etc/data
-    depends_on:
-      postgres_db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      minio-init-bucket:
-        condition: service_completed_successfully
 
   # =============================================================================
   # SPARK CLUSTER (profile: spark, full)

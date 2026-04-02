@@ -7,7 +7,6 @@ import pytest
 from poor_man_lakehouse.spark_connector.builder import (
     COMMON_PACKAGES,
     CatalogType,
-    DeltaUnityCatalogSparkBuilder,
     GlueCatalogSparkBuilder,
     LakekeeperCatalogSparkBuilder,
     NessieCatalogSparkBuilder,
@@ -22,7 +21,6 @@ class TestCatalogType:
     def test_catalog_type_values(self):
         """Test CatalogType enum has expected values."""
         assert CatalogType.POSTGRES.value == "postgres"
-        assert CatalogType.UNITY_CATALOG.value == "unity_catalog"
         assert CatalogType.NESSIE.value == "nessie"
         assert CatalogType.LAKEKEEPER.value == "lakekeeper"
         assert CatalogType.GLUE.value == "glue"
@@ -50,11 +48,6 @@ class TestGetSparkBuilder:
         """Test get_spark_builder accepts string input."""
         builder = get_spark_builder("postgres")
         assert isinstance(builder, PostgresCatalogSparkBuilder)
-
-    def test_returns_unity_catalog_builder(self):
-        """Test get_spark_builder returns DeltaUnityCatalogSparkBuilder."""
-        builder = get_spark_builder(CatalogType.UNITY_CATALOG)
-        assert isinstance(builder, DeltaUnityCatalogSparkBuilder)
 
     def test_returns_nessie_builder(self):
         """Test get_spark_builder returns NessieCatalogSparkBuilder."""
@@ -182,20 +175,6 @@ class TestLakekeeperCatalogSparkBuilder:
         # Verify Lakekeeper URI was used
         config_calls = [str(call) for call in mock_builder.config.call_args_list]
         assert any("http://lakekeeper:8181" in str(call) for call in config_calls)
-
-
-class TestDeltaUnityCatalogSparkBuilder:
-    """Tests for DeltaUnityCatalogSparkBuilder."""
-
-    def test_get_packages_includes_unity_catalog(self):
-        """Test _get_packages includes Unity Catalog package."""
-        builder = DeltaUnityCatalogSparkBuilder()
-        packages = builder._get_packages()
-
-        # Should include Unity Catalog package
-        assert any("unitycatalog-spark" in pkg for pkg in packages)
-        # Should also include common packages
-        assert any("iceberg-spark-runtime" in pkg for pkg in packages)
 
 
 class TestCommonPackages:

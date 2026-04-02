@@ -1,0 +1,83 @@
+[project]
+site_name = "Poor Man's Lakehouse"
+site_description = "A composable, local Open Source Lakehouse with multiple catalog backends, compute engines, and table formats."
+site_url = "https://montanarograziano.github.io/poor-man-lakehouse/"
+repo_url = "https://github.com/montanarograziano/poor-man-lakehouse"
+repo_name = "montanarograziano/poor-man-lakehouse"
+copyright = "Copyright &copy; 2025 Graziano Montanaro"
+
+nav = [
+  {"Home" = "index.md"},
+  {"Getting Started" = [
+    {"Installation" = "guides/installation.md"},
+    {"Configuration" = "guides/configuration.md"},
+    {"Quick Start" = "guides/quickstart.md"},
+  ]},
+  {"Connectors" = [
+    {"Overview" = "guides/connectors-overview.md"},
+    {"Catalog Factory" = "guides/catalog-factory.md"},
+    {"Lakehouse Connector" = "guides/lakehouse-connector.md"},
+    {"Spark Builders" = "guides/spark-connector.md"},
+  ]},
+  {"Infrastructure" = [
+    {"Docker Services" = "guides/docker-services.md"},
+    {"Spark Cluster" = "guides/spark-cluster.md"},
+  ]},
+  {"API Reference" = "reference/index.md"},
+]
+
+[project.theme]
+font.text = "Inter"
+font.code = "JetBrains Mono"
+features = [
+  "content.code.copy",
+  "content.code.annotate",
+  "header.autohide",
+  "navigation.tabs",
+  "navigation.tabs.sticky",
+  "navigation.sections",
+  "navigation.expand",
+  "navigation.top",
+  "navigation.footer",
+  "navigation.instant",
+  "navigation.instant.progress",
+  "search.highlight",
+  "toc.follow",
+  "announce.dismiss",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "deep-purple"
+accent = "amber"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "deep-purple"
+accent = "amber"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+show_source = true
+show_root_heading = true
+heading_level = 2
+inherited_members = true
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/montanarograziano/poor-man-lakehouse"
+name = "poor-man-lakehouse on GitHub"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/python"
+link = "https://pypi.org/project/poor-man-lakehouse/"
+name = "poor-man-lakehouse on PyPI"

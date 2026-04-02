@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "lakehouse_db"
 
     # Catalog settings
-    CATALOG: str = "nessie"  # Options: "unity_catalog", "nessie", "lakekeeper", "postgres", "glue"
+    CATALOG: str = "nessie"  # Options: "nessie", "lakekeeper", "postgres", "glue"
     CATALOG_URI: str = "http://localhost:8080"
     CATALOG_NAME: str = "nessie"
     CATALOG_DEFAULT_SCHEMA: str = "default"
@@ -67,18 +67,8 @@ class Settings(BaseSettings):
     LAKEKEEPER_SERVER_URI: str = "http://lakekeeper:8181/catalog"
     LAKEKEEPER_WAREHOUSE: str = "warehouse"
 
-    # Unity Catalog Configuration
-    UNITY_CATALOG_URI: str = "http://unity_catalog:8080/"
-
     # AWS Glue Catalog Configuration
     GLUE_CATALOG_ID: str = ""  # AWS account ID for cross-account access; empty = default account
-
-    # Dremio settings
-    DREMIO_SERVER_URI: str = "http://dremio:9047"
-    ARROW_ENDPOINT: str = "grpc://dremio:32010"
-    DREMIO_USERNAME: str = "dremio"
-    DREMIO_ROOT_PASSWORD: str = ""
-    DREMIO_ROOT_EMAIL: str = "admin@example.com"
 
     # Spark settings
     SPARK_MASTER: str = "spark://localhost:7077"
@@ -199,25 +189,6 @@ def reload_settings() -> Settings:
     """Reload base settings."""
     get_settings.cache_clear()
     return get_settings()
-
-
-def require_catalog(expected: str, *, connector_name: str, current_settings: Settings | None = None) -> None:
-    """Validate that the active catalog matches the expected one.
-
-    Args:
-        expected: The required catalog name.
-        connector_name: Name of the connector for error messages.
-        current_settings: Settings instance to check. Defaults to the global singleton.
-
-    Raises:
-        ValueError: If the active catalog doesn't match.
-    """
-    s = current_settings or get_settings()
-    if s.CATALOG.lower() != expected.lower():
-        raise ValueError(
-            f"{connector_name} requires '{expected}' catalog, "
-            f"but CATALOG='{s.CATALOG}'. Set CATALOG={expected} in your environment."
-        )
 
 
 # default settings with initialization

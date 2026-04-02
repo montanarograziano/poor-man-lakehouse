@@ -12,8 +12,6 @@ All infrastructure runs via Docker Compose with profile-based service selection.
 | *(none)* | MinIO, PostgreSQL | 9000, 9001, 5432 |
 | `nessie` | + Nessie | + 19120 |
 | `lakekeeper` | + Lakekeeper + bootstrap + warehouse init | + 8181 |
-| `unity` | + Unity Catalog | + 8080 |
-| `dremio` | + Nessie + Dremio | + 19120, 9047, 31010, 32010 |
 | `spark` | + Spark Master + Worker | + 7077, 8081, 8082 |
 | `full` | All of the above | All ports |
 
@@ -69,12 +67,6 @@ Used as the metadata backend for Nessie and Lakekeeper.
 - **Port**: 8181
 - **Backend**: PostgreSQL
 - **Initialization**: Migration, bootstrap, and warehouse creation via sidecar containers
-
-### Unity Catalog
-
-- **Image**: `unitycatalog/unitycatalog:latest`
-- **Port**: 8080
-- **Status**: Experimental
 
 ## Compute Services
 

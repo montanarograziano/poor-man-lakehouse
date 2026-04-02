@@ -27,7 +27,6 @@ COMMON_PACKAGES: list[str] = [
     "org.apache.hadoop:hadoop-aws:3.4.1",
     "org.postgresql:postgresql:42.7.10",
     f"org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_{SCALA_VERSION}:0.106.0",
-    f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.4.0",
 ]
 
 
@@ -35,7 +34,6 @@ class CatalogType(str, Enum):
     """Supported catalog types."""
 
     POSTGRES = "postgres"
-    UNITY_CATALOG = "unity_catalog"
     NESSIE = "nessie"
     LAKEKEEPER = "lakekeeper"
     GLUE = "glue"
@@ -198,66 +196,6 @@ class PostgresCatalogSparkBuilder(SparkBuilder):
         return spark
 
 
-class DeltaUnityCatalogSparkBuilder(SparkBuilder):
-    """Builder for Spark session with Delta Lake and Unity Catalog support.
-
-    Uses configure_spark_with_delta_pip for Delta Lake JAR management.
-    Based on Unity Catalog OSS Spark integration.
-
-    For MinIO/S3-compatible storage:
-    - UC server vends credentials dynamically per-table via temporary credentials API
-    - DO NOT set static fs.s3a.access.key/secret.key - they conflict with vended credentials
-    - Only set endpoint and path-style config for MinIO compatibility
-    """
-
-    UNITY_CATALOG_PACKAGE: ClassVar[str] = f"io.unitycatalog:unitycatalog-spark_{SCALA_VERSION}:0.4.0"
-
-    def _get_packages(self) -> list[str]:
-        packages = super()._get_packages()
-        packages.append(self.UNITY_CATALOG_PACKAGE)
-        return packages
-
-    def _configure_common(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        """Apply common configuration WITHOUT static S3 credentials.
-
-        Unity Catalog uses credential vending - it provides temporary credentials
-        per-table/path operation via the TemporaryCredentials API. Static credentials
-        in Hadoop config conflict with this mechanism.
-
-        Only configure:
-        - SQL extensions for Delta/Iceberg
-        - S3A endpoint and path-style access for MinIO compatibility
-        """
-        extensions = f"{self.ICEBERG_EXTENSIONS},{self.DELTA_EXTENSIONS}"
-        return (
-            builder.config("spark.sql.extensions", extensions)
-            # S3A endpoint configuration for MinIO (no static credentials!)
-            .config("spark.hadoop.fs.s3a.endpoint", settings.AWS_ENDPOINT_URL)
-            .config("spark.hadoop.fs.s3a.endpoint.region", settings.AWS_DEFAULT_REGION)
-            .config("spark.hadoop.fs.s3a.path.style.access", "true")
-            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        )
-
-    def _configure_catalog(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        catalog = self.catalog_name
-
-        return (
-            builder.config(f"spark.sql.catalog.{catalog}", "io.unitycatalog.spark.UCSingleCatalog")
-            .config(f"spark.sql.catalog.{catalog}.uri", settings.UNITY_CATALOG_URI)
-            .config(f"spark.sql.catalog.{catalog}.token", "")
-            .config(f"spark.sql.catalog.{catalog}.renewCredential.enabled", "true")
-            # Map s3:// scheme to s3a filesystem implementation
-            .config("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .config("spark.sql.catalog.spark_catalog", "io.unitycatalog.spark.UCSingleCatalog")
-            .config("spark.sql.defaultCatalog", catalog)
-        )
-
-    def get_spark_session(self) -> SparkSession:
-        """Get a Spark session configured for Delta Lake with Unity Catalog."""
-        return super().get_spark_session()
-
-
 class NessieCatalogSparkBuilder(SparkBuilder):
     """Builder for Spark session with Nessie catalog.
 
@@ -408,7 +346,6 @@ class GlueCatalogSparkBuilder(SparkBuilder):
 
 _CATALOG_BUILDERS: dict[CatalogType, type[SparkBuilder]] = {
     CatalogType.POSTGRES: PostgresCatalogSparkBuilder,
-    CatalogType.UNITY_CATALOG: DeltaUnityCatalogSparkBuilder,
     CatalogType.NESSIE: NessieCatalogSparkBuilder,
     CatalogType.LAKEKEEPER: LakekeeperCatalogSparkBuilder,
     CatalogType.GLUE: GlueCatalogSparkBuilder,

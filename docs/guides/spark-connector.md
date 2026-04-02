@@ -42,7 +42,7 @@ spark.sql("INSERT INTO nessie.default.users VALUES (1, 'Alice')")
 
 ### LakekeeperCatalogSparkBuilder
 
-Uses Lakekeeper's REST catalog interface.
+Uses Lakekeeper's REST catalog interface with credential vending (no static S3 keys in Spark config).
 
 ```python
 builder = get_spark_builder(CatalogType.LAKEKEEPER)
@@ -56,21 +56,32 @@ spark.sql("SELECT * FROM lakekeeper.default.users").show()
 
 ### PostgresCatalogSparkBuilder
 
-Uses PostgreSQL as the Iceberg catalog backend via JDBC.
+Uses PostgreSQL as the Iceberg catalog backend via JDBC. This is the tested and recommended implementation for local development.
 
 ```python
 builder = get_spark_builder(CatalogType.POSTGRES)
 spark = builder.get_spark_session()
 ```
 
-### DeltaUnityCatalogSparkBuilder
+### GlueCatalogSparkBuilder
 
-Uses Unity Catalog OSS with credential vending (no static S3 credentials).
+Uses AWS Glue as the Iceberg catalog backend. Credentials are resolved via the AWS default credential chain (env vars, `~/.aws/credentials`, IAM role) -- no static S3 keys in Spark config.
 
 ```python
-builder = get_spark_builder(CatalogType.UNITY_CATALOG)
+builder = get_spark_builder(CatalogType.GLUE)
 spark = builder.get_spark_session()
 ```
+
+Optionally set `GLUE_CATALOG_ID` for cross-account Glue access.
+
+## Supported Catalog Types
+
+| Enum Value | String | Builder Class | Credential Handling |
+|------------|--------|---------------|---------------------|
+| `CatalogType.POSTGRES` | `"postgres"` | `PostgresCatalogSparkBuilder` | Static S3 keys from settings |
+| `CatalogType.NESSIE` | `"nessie"` | `NessieCatalogSparkBuilder` | Static S3 keys from settings |
+| `CatalogType.LAKEKEEPER` | `"lakekeeper"` | `LakekeeperCatalogSparkBuilder` | Credential vending (no static keys) |
+| `CatalogType.GLUE` | `"glue"` | `GlueCatalogSparkBuilder` | AWS credential chain (no static keys) |
 
 ## Common Configuration
 
@@ -108,3 +119,5 @@ For local mode (no cluster):
 ```dotenv
 SPARK_MASTER="local[*]"
 ```
+
+See the [Spark Cluster guide](spark-cluster.md) for details on the Docker-based Spark standalone cluster.
