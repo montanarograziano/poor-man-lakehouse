@@ -1,11 +1,8 @@
 """Poor Man Lakehouse - Multi-engine data lakehouse connectors."""
 
-from poor_man_lakehouse.catalog_browser import CatalogBrowser
+from poor_man_lakehouse.catalog import LakehouseCatalogType, get_catalog
 from poor_man_lakehouse.config import Settings, get_settings, reload_settings, settings
-from poor_man_lakehouse.dremio_connector import DremioConnection
-from poor_man_lakehouse.ibis_connector import IbisConnection
-from poor_man_lakehouse.polars_connector import PolarsClient, load_sql_magic
-from poor_man_lakehouse.pyiceberg_connector import PyIcebergClient
+from poor_man_lakehouse.lakehouse import LakehouseConnection
 from poor_man_lakehouse.spark_connector import (
     CatalogType,
     get_spark_builder,
@@ -14,18 +11,15 @@ from poor_man_lakehouse.spark_connector import (
 
 __all__ = [
     # Catalog
-    "CatalogBrowser",
+    "LakehouseCatalogType",
+    "get_catalog",
     # Config
     "Settings",
     "get_settings",
     "reload_settings",
     "settings",
     # Connectors
-    "DremioConnection",
-    "IbisConnection",
-    "PolarsClient",
-    "PyIcebergClient",
-    "load_sql_magic",
+    "LakehouseConnection",
     # Spark
     "CatalogType",
     "get_spark_builder",

@@ -8,7 +8,7 @@ set positional-arguments
 install:
     {{just_executable()}} needs uv
     uv sync --all-groups
-    uv run prek install
+    uv run prek install --overwrite
 
 # Update dependencies and pre-commit hooks
 update:
@@ -23,20 +23,22 @@ lint:
     uv run mypy src
     uv run pyright src
 
-# Run all tests
+# Run unit tests (no external dependencies)
 test:
-    uv run pytest tests
+    uv run pytest tests -m "not integration"
+
+# Run integration tests (requires docker-compose services running)
+test-integration:
+    uv run pytest tests -m "integration"
 
 # Run all tests with coverage
 test-coverage:
-    uv run pytest --cov=src --cov-report=term-missing --cov-report=html 
+    uv run pytest --cov=src --cov-report=term-missing --cov-report=html -m "not integration"
 
 # Launch docker compose with optional profile
 # Usage: just up              (core only: minio + postgres)
 #        just up nessie       (core + Nessie catalog)
 #        just up lakekeeper   (core + Lakekeeper catalog)
-#        just up dremio       (core + Nessie + Dremio)
-#        just up spark        (core + Spark cluster)
 #        just up full         (all services)
 up profile="":
   {{just_executable()}} needs docker
@@ -77,7 +79,11 @@ alias c := commit
 
 # Live preview the documentation
 preview-docs:
-  uv run mkdocs serve
+  uv run zensical serve
+
+# Build the documentation
+build-docs:
+  uv run zensical build
 
 # Assert a command is available
 [private]

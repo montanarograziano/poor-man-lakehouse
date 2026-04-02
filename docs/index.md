@@ -17,30 +17,29 @@ Setting up a modern lakehouse stack typically requires cloud infrastructure, ven
 +---------------------------------------------------------------+
 |                      Your Application                          |
 +---------------------------------------------------------------+
-|   IbisConnection    PolarsClient    PyIcebergClient            |
-|   (multi-engine)    (SQL + scan)   (table management)          |
+|   LakehouseConnection          |   Spark Builders              |
+|   (Polars, DuckDB, Arrow,      |   (PySpark + Iceberg/Delta)   |
+|    Ibis, catalog browsing)     |                               |
 +---------------------------------------------------------------+
-|  PySpark | Polars | DuckDB | Sail (Rust) | Dremio (Flight)    |
+|                   get_catalog() — PyIceberg                    |
+|   Unified catalog factory for all backends                     |
 +---------------------------------------------------------------+
 |                      Catalog Layer                              |
-|   Nessie  |  Lakekeeper  |  Unity Catalog  |  PostgreSQL       |
+|   Nessie  |  Lakekeeper  |  PostgreSQL  |  AWS Glue            |
 +---------------------------------------------------------------+
 |                      Storage Layer                              |
-|                   MinIO (S3-compatible)                         |
+|          MinIO (S3-compatible)  |  AWS S3 (Glue only)          |
 +---------------------------------------------------------------+
 ```
 
 ## Components at a Glance
 
-| Component | Purpose | Catalog Requirement |
-|-----------|---------|-------------------|
-| [`IbisConnection`](guides/ibis-connector.md) | Multi-engine access (PySpark, Polars, DuckDB) + DuckDB writes | Lakekeeper |
-| [`PyIcebergClient`](guides/pyiceberg-connector.md) | Schema inspection, snapshots, time travel (no JVM) | Any REST catalog |
-| [`CatalogBrowser`](guides/catalog-browser.md) | Catalog-agnostic namespace/table browsing | Any REST catalog |
-| [`PolarsClient`](guides/polars-connector.md) | SQL queries + catalog browsing via Polars | Unity or Lakekeeper |
-| [`SparkBuilder`](guides/spark-connector.md) | Configured SparkSession per catalog type | Any |
+| Component | Purpose | Catalog Support |
+|-----------|---------|-----------------|
+| [`get_catalog()`](guides/catalog-factory.md) | PyIceberg catalog factory — single source of truth for catalog config | All (Nessie, Lakekeeper, PostgreSQL, Glue) |
+| [`LakehouseConnection`](guides/lakehouse-connector.md) | Unified lightweight connector: catalog browsing, Polars/Arrow scans, DuckDB engine, Ibis wrappers, SQL, writes | All (via `get_catalog()`) |
+| [`SparkBuilder`](guides/spark-connector.md) | Configured SparkSession per catalog type | All |
 | [Sail](guides/connectors-overview.md#sail-pysail) | Rust-powered Spark Connect engine (no JVM) — Delta, Iceberg, S3 | Local file-based |
-| [`DremioConnection`](guides/dremio-connector.md) | Arrow Flight query federation | Nessie + Dremio |
 
 ## Quick Start
 

@@ -156,24 +156,3 @@ class TestSettingsError:
         error = SettingsError("test message")
         assert isinstance(error, Exception)
         assert str(error) == "test message"
-
-
-class TestRequireCatalog:
-    """Tests for require_catalog helper."""
-
-    def test_require_catalog_passes_for_matching(self, monkeypatch):
-        """Test require_catalog passes when catalog matches."""
-        monkeypatch.delenv("CATALOG", raising=False)
-        from poor_man_lakehouse.config import require_catalog
-
-        s = Settings(_env_file=None)  # defaults to CATALOG="nessie"
-        require_catalog("nessie", connector_name="test", current_settings=s)
-
-    def test_require_catalog_raises_for_mismatch(self, monkeypatch):
-        """Test require_catalog raises when catalog doesn't match."""
-        monkeypatch.delenv("CATALOG", raising=False)
-        from poor_man_lakehouse.config import require_catalog
-
-        s = Settings(_env_file=None)  # defaults to CATALOG="nessie"
-        with pytest.raises(ValueError, match="requires 'lakekeeper' catalog"):
-            require_catalog("lakekeeper", connector_name="IbisConnection", current_settings=s)
