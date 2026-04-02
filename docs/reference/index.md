@@ -16,30 +16,21 @@ Auto-generated documentation from source code docstrings.
 
 ::: poor_man_lakehouse.config.reload_settings
 
-::: poor_man_lakehouse.config.require_catalog
+---
+
+## Catalog Factory
+
+::: poor_man_lakehouse.catalog.get_catalog
+
+::: poor_man_lakehouse.catalog.LakehouseCatalogType
 
 ---
 
 ## Connectors
 
-### IbisConnection
+### LakehouseConnection
 
-::: poor_man_lakehouse.ibis_connector.builder.IbisConnection
-    options:
-      members:
-        - __init__
-        - get_connection
-        - read_table
-        - write_table
-        - create_table
-        - sql
-        - list_tables
-        - set_current_database
-        - close
-
-### PyIcebergClient
-
-::: poor_man_lakehouse.pyiceberg_connector.client.PyIcebergClient
+::: poor_man_lakehouse.lakehouse.LakehouseConnection
     options:
       members:
         - __init__
@@ -48,48 +39,15 @@ Auto-generated documentation from source code docstrings.
         - load_table
         - table_schema
         - snapshot_history
-        - scan_to_polars
-        - scan_to_arrow
-
-### CatalogBrowser
-
-::: poor_man_lakehouse.catalog_browser.CatalogBrowser
-    options:
-      members:
-        - __init__
-        - list_namespaces
-        - list_tables
-        - get_table_schema
-        - get_snapshot_count
-
-### PolarsClient
-
-::: poor_man_lakehouse.polars_connector.client.PolarsClient
-    options:
-      members:
-        - __init__
-        - list_catalogs
-        - list_namespaces
-        - list_tables
-        - scan_table
+        - scan_polars
+        - scan_arrow
+        - duckdb_connection
+        - ibis_duckdb
+        - ibis_polars
+        - ibis_pyspark
         - sql
-        - show_catalog_tree
-        - describe_table
-        - load_all_tables
-        - to_duckdb
-        - clear_cache
-
-### DremioConnection
-
-::: poor_man_lakehouse.dremio_connector.builder.DremioConnection
-    options:
-      members:
-        - __init__
-        - to_polars
-        - to_duckdb
-        - to_pandas
-        - to_arrow
-        - set_catalog
+        - write_table
+        - create_table
         - close
 
 ---

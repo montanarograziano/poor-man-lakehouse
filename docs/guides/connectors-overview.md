@@ -1,21 +1,17 @@
 # Connectors Overview
 
-Poor Man's Lakehouse provides multiple connectors for different use cases. This guide helps you choose the right one.
+Poor Man's Lakehouse provides a small set of focused connectors for different use cases. This guide helps you choose the right one.
 
 ## Decision Tree
 
 ```
 Do you need to write data?
-  YES -> IbisConnection (DuckDB engine), SparkBuilder, or Sail
+  YES -> LakehouseConnection (DuckDB engine), SparkBuilder, or Sail
   NO  -> Continue...
 
 Do you need a JVM?
-  NO  -> PyIcebergClient, PolarsClient, CatalogBrowser, or Sail
-  YES -> Continue...
-
-Do you need multi-engine comparison?
-  YES -> IbisConnection
-  NO  -> SparkBuilder (if you need Spark) or DremioConnection (if you need federation)
+  NO  -> LakehouseConnection (Polars, DuckDB, Arrow scans) or Sail
+  YES -> SparkBuilder or LakehouseConnection.ibis_pyspark()
 
 Do you want PySpark API without a JVM?
   YES -> Sail (Rust-based Spark Connect engine)
@@ -23,72 +19,70 @@ Do you want PySpark API without a JVM?
 
 ## Connector Comparison
 
-| Feature | IbisConnection | PyIcebergClient | CatalogBrowser | PolarsClient | SparkBuilder | Sail | DremioConnection |
-|---------|---------------|-----------------|----------------|-------------|-------------|------|-----------------|
-| **Read tables** | PySpark, Polars, DuckDB | Polars, Arrow | - | Polars | PySpark | PySpark API | Arrow, Polars, DuckDB, Pandas |
-| **Write tables** | DuckDB | - | - | - | PySpark | Delta, Iceberg, Parquet | - |
-| **Schema inspection** | - | Full schema + history | Schema only | Schema | Via Spark | Via PySpark API | - |
-| **SQL execution** | PySpark, DuckDB | - | - | Polars SQL | Spark SQL | PySpark SQL | Dremio SQL |
-| **Requires JVM** | Only for PySpark engine | No | No | No | Yes | **No (Rust)** | No |
-| **Catalog** | Lakekeeper only | Any REST | Any REST | Unity or Lakekeeper | Any | Local file-based | Nessie + Dremio |
-| **Context manager** | Yes | No | No | No | No | Manual start/stop | Yes |
+| Feature | LakehouseConnection | SparkBuilder | Sail |
+|---------|-------------------|-------------|------|
+| **Read tables** | Polars, Arrow, DuckDB, Ibis (PySpark/Polars/DuckDB) | PySpark | PySpark API |
+| **Write tables** | DuckDB (Iceberg) | PySpark | Delta, Iceberg, Parquet |
+| **Catalog browsing** | Namespaces, tables, schemas, snapshots | Via Spark SQL | - |
+| **SQL execution** | DuckDB, PySpark (via Ibis) | Spark SQL | PySpark SQL |
+| **Requires JVM** | Only for `ibis_pyspark()` | Yes | **No (Rust)** |
+| **Catalog support** | All (Nessie, Lakekeeper, PostgreSQL, Glue) | All | Local file-based |
+| **Context manager** | Yes | No | Manual start/stop |
+| **Backed by** | PyIceberg + Ibis | Spark + Iceberg/Delta JARs | Rust Spark Connect |
 
 ## When to Use Each
 
-### IbisConnection
-**Best for:** Comparing engines side-by-side, DuckDB Iceberg writes, unified API across PySpark/Polars/DuckDB.
+### LakehouseConnection
+
+**Best for:** Most use cases. Catalog browsing, reading tables into Polars/DuckDB/Arrow, writing via DuckDB, multi-engine comparison via Ibis — all without a JVM (except PySpark engine).
 
 ```python
-with IbisConnection() as conn:
-    # Same table, three engines
-    spark_result = conn.read_table("default", "users", "pyspark")
-    duck_result = conn.read_table("default", "users", "duckdb")
-    polars_result = conn.read_table("default", "users", "polars")
+from poor_man_lakehouse import LakehouseConnection
+
+with LakehouseConnection() as conn:
+    # Browse the catalog (no JVM)
+    namespaces = conn.list_namespaces()
+    tables = conn.list_tables("default")
+    schema = conn.table_schema("default", "users")
+
+    # Scan to Polars (no JVM)
+    lf = conn.scan_polars("default", "users")
+    result = lf.filter(pl.col("age") > 25).collect()
+
+    # DuckDB SQL with attached Iceberg catalog
+    result = conn.sql("SELECT * FROM lakekeeper.default.users WHERE age > 25")
+
+    # Write data via DuckDB
+    conn.create_table("default", "output", "id INTEGER, name VARCHAR")
+    conn.write_table("default", "output", query="SELECT 1, 'Alice'")
+
+    # Ibis multi-engine access
+    duck_ibis = conn.ibis_duckdb()
+    spark_ibis = conn.ibis_pyspark()  # this one needs JVM
 ```
 
-### PyIcebergClient
-**Best for:** Table metadata operations, snapshot history, schema evolution, time travel — all without a JVM.
-
-```python
-client = PyIcebergClient()
-schema = client.table_schema("default", "users")
-history = client.snapshot_history("default", "users")
-df = client.scan_to_polars("default", "users")
-```
-
-### CatalogBrowser
-**Best for:** Quick catalog exploration across any REST catalog (Nessie or Lakekeeper).
-
-```python
-browser = CatalogBrowser()  # Auto-resolves URI from CATALOG setting
-namespaces = browser.list_namespaces()
-tables = browser.list_tables("default")
-schema = browser.get_table_schema("default", "users")
-```
-
-### PolarsClient
-**Best for:** SQL queries against Unity Catalog or Lakekeeper with Polars, Jupyter `%%sql` magic.
-
-```python
-# Unity Catalog
-client = PolarsClient()
-
-# Or Lakekeeper
-client = PolarsClient(backend="lakekeeper")
-
-df = client.sql("SELECT * FROM catalog.namespace.table WHERE id > 10")
-```
+See the [Lakehouse Connector guide](lakehouse-connector.md) for full details.
 
 ### SparkBuilder
-**Best for:** Full Spark ecosystem access, complex ETL, when you need Spark-specific features.
+
+**Best for:** Full Spark ecosystem access, complex ETL, Spark-specific features (broadcast joins, UDFs, streaming), or when you need Spark SQL specifically.
 
 ```python
-builder = get_spark_builder(CatalogType.NESSIE)
+from poor_man_lakehouse import get_spark_builder, CatalogType
+
+builder = get_spark_builder(CatalogType.LAKEKEEPER)
 spark = builder.get_spark_session()
-spark.sql("CREATE TABLE nessie.default.users (id INT, name STRING)")
+
+spark.sql("CREATE TABLE lakekeeper.default.users (id INT, name STRING)")
+spark.sql("INSERT INTO lakekeeper.default.users VALUES (1, 'Alice')")
+df = spark.sql("SELECT * FROM lakekeeper.default.users")
+df.show()
 ```
 
+See the [Spark Builders guide](spark-connector.md) for full details.
+
 ### Sail (pysail)
+
 **Best for:** PySpark-compatible workloads without a JVM, Delta/Iceberg/Parquet reads and writes, fast local development.
 
 Sail is a Rust-based compute engine that implements the Spark Connect protocol. It provides the PySpark API without requiring Java.
@@ -116,10 +110,11 @@ server.stop()
 !!! warning "No REST catalog support yet"
     Sail does not support Lakekeeper/Nessie REST catalogs. It works with local file-based table formats and direct S3 paths.
 
-### DremioConnection
-**Best for:** Query federation across multiple sources, Arrow Flight protocol, when Dremio is your query engine.
+## Catalog Support Matrix
 
-```python
-with DremioConnection() as conn:
-    df = conn.to_polars("SELECT * FROM nessie.default.users")
-```
+| Catalog | `get_catalog()` | `LakehouseConnection` | `SparkBuilder` |
+|---------|----------------|----------------------|----------------|
+| **Nessie** | REST | All features | `NessieCatalogSparkBuilder` |
+| **Lakekeeper** | REST | All features | `LakekeeperCatalogSparkBuilder` |
+| **PostgreSQL** | SQL | Browsing + scans (no DuckDB attach) | `PostgresCatalogSparkBuilder` |
+| **Glue** | Glue | All features | `GlueCatalogSparkBuilder` |

@@ -36,7 +36,7 @@ cp .env.example .env
 Edit `.env` to set your preferred catalog:
 
 ```dotenv
-CATALOG="lakekeeper"          # Options: nessie, lakekeeper, postgres, unity_catalog
+CATALOG="lakekeeper"          # Options: nessie, lakekeeper, postgres, glue
 CATALOG_NAME="lakekeeper"
 AWS_ACCESS_KEY_ID="minioadmin"
 AWS_SECRET_ACCESS_KEY="miniopassword"
@@ -49,7 +49,7 @@ See [Configuration](configuration.md) for all available settings.
 The `.env` file uses Docker service names (`minio`, `postgres_db`, `nessie`, `lakekeeper`). For local Python development outside Docker, add them to your hosts file:
 
 ```bash
-echo "127.0.0.1 minio postgres_db nessie lakekeeper dremio" | sudo tee -a /etc/hosts
+echo "127.0.0.1 minio postgres_db nessie lakekeeper" | sudo tee -a /etc/hosts
 ```
 
 This allows the same `.env` to work both inside Docker containers and for local development.
@@ -68,7 +68,6 @@ just up lakekeeper   # Recommended: Core + Lakekeeper catalog
 | Lakekeeper API | http://localhost:8181 | - |
 | Nessie API | http://localhost:19120 | - |
 | Spark Master UI | http://localhost:8081 | - |
-| Dremio UI | http://localhost:9047 | dremio / dremio123 |
 
 ## Useful Commands
 

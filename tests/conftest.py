@@ -70,19 +70,11 @@ def mock_settings():
         mock_instance.CATALOG_DEFAULT_SCHEMA = "default"
 
         # Nessie settings
-        mock_instance.NESSIE_SPARK_SERVER_URI = "http://localhost:19120/api/v1"
-        mock_instance.NESSIE_DREMIO_SERVER_URI = "http://localhost:19120/api/v2"
-        mock_instance.NESSIE_PYICEBERG_SERVER_URI = "http://localhost:19120/iceberg"
+        mock_instance.NESSIE_NATIVE_URI = "http://localhost:19120/api/v2"
+        mock_instance.NESSIE_REST_URI = "http://localhost:19120/iceberg"
 
         # Lakekeeper settings
         mock_instance.LAKEKEEPER_SERVER_URI = "http://localhost:8181"
-
-        # Dremio settings
-        mock_instance.DREMIO_SERVER_URI = "http://localhost:9047"
-        mock_instance.ARROW_ENDPOINT = "grpc://localhost:32010"
-        mock_instance.DREMIO_USERNAME = "dremio"
-        mock_instance.DREMIO_ROOT_PASSWORD = "password123"  # noqa: S105
-        mock_instance.DREMIO_ROOT_EMAIL = "admin@example.com"
 
         # Spark settings
         mock_instance.SPARK_MASTER = "local[*]"

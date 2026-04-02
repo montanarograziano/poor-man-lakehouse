@@ -8,7 +8,7 @@ set positional-arguments
 install:
     {{just_executable()}} needs uv
     uv sync --all-groups
-    uv run prek install
+    uv run prek install --overwrite
 
 # Update dependencies and pre-commit hooks
 update:
@@ -29,7 +29,7 @@ test:
 
 # Run all tests with coverage
 test-coverage:
-    uv run pytest --cov=src --cov-report=term-missing --cov-report=html 
+    uv run pytest --cov=src --cov-report=term-missing --cov-report=html
 
 # Launch docker compose with optional profile
 # Usage: just up              (core only: minio + postgres)
@@ -77,7 +77,11 @@ alias c := commit
 
 # Live preview the documentation
 preview-docs:
-  uv run mkdocs serve
+  uv run zensical serve
+
+# Build the documentation
+build-docs:
+  uv run zensical build
 
 # Assert a command is available
 [private]
