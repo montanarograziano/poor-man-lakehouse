@@ -168,3 +168,6 @@ data/
 # Playground notebooks and scripts
 prova.py
 prova.ipynb
+
+# karva cache
+.karva_cache/
