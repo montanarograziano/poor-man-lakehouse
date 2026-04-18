@@ -41,6 +41,8 @@ dev = [
     "types-requests>=2.32.4.20250611",
     "pyarrow-stubs>=20.0.0.20251215",
     "testcontainers[compose]>=4.14.2",
+    "karva>=0.0.1a4",
+    "marimo>=0.17.7",
 ]
 
 docs = [
@@ -63,6 +65,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "ibis.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "testcontainers.*"
 ignore_missing_imports = true
 
 [tool.pyright]
