@@ -190,7 +190,7 @@ class TestLakehouseConnectionSQL:
 
         conn = LakehouseConnection()
         with pytest.raises(ValueError, match="SQL execution only supports"):
-            conn.sql("SELECT 1", "polars")  # type: ignore[arg-type]
+            conn.sql("SELECT 1", "polars")  # pyright: ignore[reportArgumentType]
 
     @patch("poor_man_lakehouse.lakehouse.get_catalog")
     def test_sql_duckdb_delegates_to_connection(self, mock_get_catalog):
@@ -219,7 +219,7 @@ class TestLakehouseConnectionWrite:
 
         conn = LakehouseConnection()
         with pytest.raises(ValueError, match="Unsupported write mode"):
-            conn.write_table("default", "test", mode="invalid")  # type: ignore[arg-type]
+            conn.write_table("default", "test", mode="invalid")  # pyright: ignore[reportArgumentType]
 
     @patch("poor_man_lakehouse.lakehouse.get_catalog")
     def test_write_table_raises_when_no_data_or_query(self, mock_get_catalog):
