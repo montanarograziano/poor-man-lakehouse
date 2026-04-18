@@ -12,7 +12,7 @@ install:
 
 # Update dependencies and pre-commit hooks
 update:
-    uv sync --all-groups --update-packages
+    uv sync --all-groups --upgrade
     uv run prek auto-update
 
 # Run linters
