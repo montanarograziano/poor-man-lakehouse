@@ -16,7 +16,6 @@ def _():
     import duckdb
     import marimo as mo
     import polars as pl
-    import pyarrow as pa
     from deltalake import DeltaTable, write_deltalake
     from loguru import logger
 
@@ -27,21 +26,24 @@ def _():
     if _benchmark_dir not in sys.path:
         sys.path.insert(0, _benchmark_dir)
 
-    from helpers import generate_data, load_config
+    from helpers import PARTITION_COL, GeneratorSpec, StreamingGenerator, load_config
 
     config = load_config(Path(__file__).resolve().parent / "config.yaml")
 
     ROW_COUNT = 1_000_000
     TABLE_NAME = "playground_partitioned"
 
-    data = generate_data(config.schema, ROW_COUNT, seed=99)
+    spec = GeneratorSpec(schema_config=config.schema, total_rows=ROW_COUNT, seed=99)
+    data = StreamingGenerator(spec).arrow_reader().read_all()
     mo.md(
         f"# Partitioned Table Playground\n\n"
         f"Generated **{data.num_rows:,}** rows with **{data.num_columns}** columns.\n\n"
-        f"Partition column: `date_col` ({data.schema.field('date_col').type})"
+        f"Partition column: `{PARTITION_COL}` ({data.schema.field(PARTITION_COL).type}), "
+        f"dates {spec.date_start} to {spec.date_end}"
     )
     return (
         DeltaTable,
+        PARTITION_COL,
         TABLE_NAME,
         config,
         data,
@@ -62,7 +64,7 @@ def _():
 
 
 @app.cell
-def _(TABLE_NAME, config, data, logger, mo, os, shutil, write_deltalake):
+def _(PARTITION_COL, TABLE_NAME, config, data, logger, mo, os, shutil, write_deltalake):
     """Write partitioned Delta table (local)."""
     delta_path = os.path.join(
         os.path.abspath(config.local.base_path),
@@ -80,16 +82,16 @@ def _(TABLE_NAME, config, data, logger, mo, os, shutil, write_deltalake):
         table_or_uri=delta_path,
         data=data,
         mode="overwrite",
-        partition_by=["date_col"],
+        partition_by=[PARTITION_COL],
     )
     n_partitions = len(
-        [d for d in os.listdir(delta_path) if d.startswith("date_col=")]
+        [d for d in os.listdir(delta_path) if d.startswith(f"{PARTITION_COL}=")]
     )
     logger.info(
         f"Delta table written to {delta_path} with {n_partitions} partitions"
     )
     mo.md(
-        f"### Delta Table (partitioned by `date_col`)\n\n"
+        f"### Delta Table (partitioned by `{PARTITION_COL}`)\n\n"
         f"- Path: `{delta_path}`\n"
         f"- Partitions: **{n_partitions}**"
     )
@@ -103,7 +105,7 @@ def _(attach_uri):
 
 
 @app.cell
-def _(TABLE_NAME, config, duckdb, logger, mo, os, shutil, subprocess):
+def _(PARTITION_COL, TABLE_NAME, config, duckdb, logger, mo, os, shutil, subprocess):
     """Write partitioned DuckLake table (local, PostgreSQL catalog)."""
     pg = config.postgres
     pg_database = f"{pg.database}_playground"
@@ -163,13 +165,13 @@ def _(TABLE_NAME, config, duckdb, logger, mo, os, shutil, subprocess):
     # Partitioning must be set before data is written — it only affects new inserts.
     # con.register("_src", data)
     con.execute(f"CREATE TABLE {fq} AS SELECT * FROM data LIMIT 0")
-    con.execute(f"ALTER TABLE {fq} SET PARTITIONED BY (date_col)")
-    logger.info("DuckLake table partitioned by date_col")
+    con.execute(f"ALTER TABLE {fq} SET PARTITIONED BY ({PARTITION_COL})")
+    logger.info(f"DuckLake table partitioned by {PARTITION_COL}")
     con.execute(f"INSERT INTO {fq} SELECT * FROM data")
     # con.unregister("data")
 
     row_count = con.execute(f"SELECT COUNT(*) FROM {fq}").fetchone()[0]
-    partition_info = "Partitioned by `date_col`"
+    partition_info = f"Partitioned by `{PARTITION_COL}`"
     logger.info(f"DuckLake table written: {row_count} rows")
 
     mo.md(
@@ -199,25 +201,25 @@ def _(delta_path, mo, pl):
 
 
 @app.cell
-def _(delta_path, mo, pl):
+def _(PARTITION_COL, delta_path, mo, pl):
     """Delta: filtered scan with partition pruning."""
     delta_filtered = (
         pl.scan_delta(delta_path)
         .filter(
-            pl.col("date_col").is_between(
-                pl.lit("2023-06-01").str.to_date(),
-                pl.lit("2023-06-30").str.to_date(),
+            pl.col(PARTITION_COL).is_between(
+                pl.lit("2024-01-10").str.to_date(),
+                pl.lit("2024-01-20").str.to_date(),
             )
         )
         .collect()
     )
-    mo.md(f"### Delta — Filtered Scan: June 2023 ({len(delta_filtered):,} rows)")
+    mo.md(f"### Delta — Filtered Scan: 2024-01-10 to 2024-01-20 ({len(delta_filtered):,} rows)")
     delta_filtered.head(20)
     return
 
 
 @app.cell
-def _(delta_path, mo, pl):
+def _(PARTITION_COL, delta_path, mo, pl):
     """Delta: aggregation by varchar_col."""
     delta_agg = (
         pl.scan_delta(delta_path)
@@ -226,8 +228,8 @@ def _(delta_path, mo, pl):
             pl.len().alias("count"),
             pl.col("int64_col").sum().alias("sum_int64"),
             pl.col("float64_col").mean().alias("avg_float64"),
-            pl.col("date_col").min().alias("min_date"),
-            pl.col("date_col").max().alias("max_date"),
+            pl.col(PARTITION_COL).min().alias("min_date"),
+            pl.col(PARTITION_COL).max().alias("max_date"),
         )
         .sort("count", descending=True)
         .collect()
@@ -280,7 +282,7 @@ def _(con, mo):
         """
         SELECT *
         from playground_ducklake.main.playground_partitioned
-        WHERE date_col BETWEEN '2023-12-01' and '2023-12-31'
+        WHERE event_date BETWEEN '2024-01-10' and '2024-01-20'
         """,
         engine=con
     )
