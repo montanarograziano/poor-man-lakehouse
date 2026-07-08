@@ -1,0 +1,132 @@
+# DuckLake v1.0 vs Delta-rs + Polars — Benchmark Configuration
+# All parameters are tunable. Modify this file to adjust the benchmark scope.
+
+benchmark:
+  name: "DuckLake v1.0 vs Delta-rs + Polars"
+  warmup_runs: 1 # Discarded runs before timing
+  repeat_runs: 3 # Timed runs per operation (median taken)
+  batch_size: 250_000 # Rows per streaming chunk; bounds generator memory
+  target_file_size_mb: 16
+    # Target size of output Parquet files. Smaller = lower
+    # writer memory (especially with many partitions) but more
+    # files. Empirically: 16 MB caps writer working set at
+    # ~150-300 MB total even at 100M rows; default (None) lets
+    # delta-rs/DuckDB choose ~100 MB which buffers GBs at scale.
+  parquet_row_group_size: 122_880
+    # Rows per Parquet row group within each file. Smaller =
+    # finer predicate pushdown but more metadata. DuckDB
+    # default is 122_880; delta-rs default is 1_048_576.
+
+table_sizes:
+  tiny: 10_000 # Smoke / dev profile (<10s end-to-end)
+  small: 100_000
+  medium: 1_000_000
+  large: 10_000_000
+  xl: 100_000_000
+
+# Storage modes available; set default_storage_modes to choose which run by default.
+storage_modes:
+  - local
+  # - s3                  # Opt-in: requires MinIO running. Uncomment to enable.
+
+default_storage_modes:
+  - local
+
+engines:
+  - ducklake
+  - delta
+
+operations:
+  write:
+    - append
+    - overwrite
+  read:
+    - full_scan
+    - filtered_scan
+    - aggregation
+  merge:
+    - upsert
+
+# Data generation schema. The generator always injects:
+#   - id_col         (sequential int64, NOT NULL)
+#   - event_date     (uniform random pa.date32 over 2024-01-01..2025-12-31, NOT NULL, partition key)
+# Plus the columns listed below for type coverage.
+schema:
+  id_col: "id"
+  seed: 42
+  merge_overlap_ratio: 0.10
+  columns:
+    # Integers
+    - { name: "int8_col", type: "int8" }
+    - { name: "int16_col", type: "int16" }
+    - { name: "int32_col", type: "int32" }
+    - { name: "int64_col", type: "int64" }
+    # Floats
+    - { name: "float32_col", type: "float32" }
+    - { name: "float64_col", type: "float64" }
+    - { name: "decimal_col", type: "decimal", precision: 18, scale: 4 }
+    # Temporal (additional to the canonical event_date partition column)
+    - { name: "datetime_col", type: "datetime" }
+    - { name: "timestamp_col", type: "timestamp" }
+    # String (varchar is dict-encoded; honored by both engines on write)
+    - { name: "varchar_col", type: "varchar", cardinality: 1000 }
+    - { name: "text_col", type: "text", avg_length: 128 }
+    # Boolean
+    - { name: "bool_col", type: "boolean" }
+    # Complex
+    - { name: "list_col", type: "list", child_type: "int32", avg_length: 5 }
+    - {
+        name: "struct_col",
+        type: "struct",
+        fields: [ "a:int32", "b:varchar", "c:float64" ],
+      }
+    - {
+        name: "map_col",
+        type: "map",
+        key_type: "varchar",
+        value_type: "int32",
+        avg_length: 3,
+      }
+
+# Filter predicate (used consistently across engines).
+# date_range applies to the partition column event_date — exercises partition pruning.
+# Default keeps ~1/3 of partitions to stress predicate pushdown vs full scan.
+filter:
+  date_range: [ "2024-01-10", "2024-01-20" ]
+  varchar_values: [ "value_001", "value_002", "value_003" ]
+
+# Infrastructure
+postgres:
+  host: "localhost"
+  port: 5432
+  database: "benchmark_db"
+  user: "user"
+  password: "password"
+
+s3:
+  endpoint: "http://localhost:9000"
+  access_key: "minioadmin"
+  secret_key: "miniopassword"
+  bucket: "warehouse"
+  ducklake_prefix: "benchmark/ducklake/"
+  delta_prefix: "benchmark/delta/"
+
+local:
+  # Relative paths are resolved against this YAML file's directory (notebooks/benchmark/),
+  # so the data location is cwd-independent. Use "data/" for the default location next to
+  # the config; absolute paths are also accepted.
+  base_path: "data/"
+  ducklake_prefix: "ducklake/"
+  delta_prefix: "delta/"
+
+metrics:
+  - wall_time_seconds
+  - peak_rss_mb
+  - delta_rss_mb
+  - disk_usage_mb
+  - postgres_metadata_mb
+  - total_storage_mb
+  - file_count
+  - throughput_rows_per_sec
+  - avg_file_size_mb
+  - scan_efficiency_ratio

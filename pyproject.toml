@@ -212,7 +212,9 @@ known-third-party = ["fastapi", "pydantic", "starlette"]
 "__init__.py" = ["D104", "F401", "I002"]
 "test*.py" = ["S101", "S105", "T201"]
 "config.py" = ["N802"]
-"notebooks/*ipynb" = ["S608"]
+# Benchmark harness and demo notebooks: asserts as invariants, SQL composed from
+# trusted config, imports inside cells, and readability-over-micro-perf loops.
+"notebooks/**" = ["S101", "S603", "S608", "TC001", "TC003", "PERF401", "E402"]
 
 #### PYTEST
 [tool.pytest.ini_options]
