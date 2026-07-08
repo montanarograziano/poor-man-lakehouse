@@ -51,7 +51,7 @@ up profile="":
 # Stop docker compose (stops all profiles)
 down:
   {{just_executable()}} needs docker
-  docker compose --profile full down
+  docker compose --profile full down --remove-orphans
 
 # Launch docker compose in clean environment
 up-clean profile="":
