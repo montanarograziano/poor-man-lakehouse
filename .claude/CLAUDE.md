@@ -21,6 +21,7 @@ uv run pytest tests/unit/test_config.py::TestSettings::test_default_values -v
 # Docker services (run ONE catalog at a time)
 just up nessie          # Core (MinIO + Postgres) + Nessie
 just up lakekeeper      # Core + Lakekeeper
+just up unity           # Core + Unity Catalog OSS (Delta-first; notebook-only, not in get_catalog())
 just down               # Stop all
 ```
 

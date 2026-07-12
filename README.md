@@ -68,6 +68,7 @@ echo "127.0.0.1 minio postgres_db nessie lakekeeper" | sudo tee -a /etc/hosts
 # Start with a specific catalog (pick ONE)
 just up lakekeeper   # Core + Lakekeeper catalog (recommended)
 just up nessie       # Core + Nessie catalog
+just up unity        # Core + Unity Catalog OSS (Delta-first, see notebooks/unity_catalog_demo.py)
 just up              # Core only (PostgreSQL JDBC catalog)
 ```
 
@@ -76,6 +77,7 @@ just up              # Core only (PostgreSQL JDBC catalog)
 - **MinIO Console**: http://localhost:9001 (minioadmin/miniopassword)
 - **Lakekeeper API**: http://localhost:8181 (if using lakekeeper profile)
 - **Nessie API**: http://localhost:19120 (if using nessie profile)
+- **Unity Catalog API**: http://localhost:8080/api/2.1/unity-catalog (if using unity profile)
 - **Spark Master UI**: http://localhost:8081 (if using spark profile)
 
 ## Usage

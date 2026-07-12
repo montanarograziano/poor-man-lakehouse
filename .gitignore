@@ -178,3 +178,12 @@ prova.ipynb
 # Benchmark data and results
 notebooks/benchmark/data/
 notebooks/benchmark/results/
+# Local lakehouse warehouses (Unity Catalog file storage, Spark local warehouse)
+warehouse/
+spark-warehouse/
+
+# Unity Catalog server-generated key material and admin token (runtime artifacts)
+configs/unity_catalog/etc/conf/certs.json
+configs/unity_catalog/etc/conf/key_id.txt
+configs/unity_catalog/etc/conf/*.der
+configs/unity_catalog/etc/conf/token.txt

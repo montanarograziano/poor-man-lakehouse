@@ -8,6 +8,7 @@
 #   docker compose up                           # Core only (PostgreSQL JDBC catalog)
 #   docker compose --profile nessie up          # Core + Nessie catalog
 #   docker compose --profile lakekeeper up      # Core + Lakekeeper catalog
+#   docker compose --profile unity up           # Core + Unity Catalog OSS
 #   docker compose --profile full up            # All services (TESTING ONLY)
 #
 # Add Spark cluster to your chosen catalog:
@@ -195,6 +196,38 @@ services:
     volumes:
       - ./scripts/init_lakekeeper_warehouse.sh:/usr/local/bin/init_lakekeeper_warehouse.sh
     entrypoint: /usr/local/bin/init_lakekeeper_warehouse.sh
+
+  # =============================================================================
+  # UNITY CATALOG OSS (profile: unity, full)
+  # =============================================================================
+  # Delta-first catalog on http://localhost:8080 (REST base: /api/2.1/unity-catalog).
+  # Metadata lives in an H2 file db under ./configs/unity_catalog/etc/data.
+  #
+  # Storage: UC OSS cannot vend credentials for S3-compatible endpoints (no
+  # s3.endpoint property upstream), so tables use file:// locations instead of
+  # MinIO. The warehouse dir is bind-mounted at the SAME absolute path inside the
+  # container (${PWD}/warehouse/unity) so the server and host engines (Spark,
+  # DuckDB) resolve identical file:// URIs. Run compose from the repo root.
+
+  unity_catalog:
+    profiles: ["unity", "full"]
+    image: unitycatalog/unitycatalog:v0.5.0
+    container_name: unity_catalog
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # The official image reads config relative to its workdir /home/unitycatalog
+      # (NOT /opt/unitycatalog, which upstream's own compose file wrongly uses).
+      - ./configs/unity_catalog/etc/conf:/home/unitycatalog/etc/conf
+      - ./configs/unity_catalog/etc/data:/home/unitycatalog/etc/data
+      - ./warehouse/unity:${PWD}/warehouse/unity
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   # =============================================================================
   # SPARK CLUSTER (profile: spark, full)

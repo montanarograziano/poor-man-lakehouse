@@ -39,6 +39,7 @@ test-coverage:
 # Usage: just up              (core only: minio + postgres)
 #        just up nessie       (core + Nessie catalog)
 #        just up lakekeeper   (core + Lakekeeper catalog)
+#        just up unity        (core + Unity Catalog OSS)
 #        just up full         (all services)
 up profile="":
   {{just_executable()}} needs docker
