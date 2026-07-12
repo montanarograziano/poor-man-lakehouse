@@ -4,6 +4,8 @@ Provides catalog browsing, native scans (Polars/Arrow), DuckDB engine access,
 and Ibis multi-engine wrappers — all backed by a single PyIceberg catalog.
 """
 
+from collections.abc import Mapping
+from datetime import datetime
 from functools import cached_property
 from typing import Literal, Self
 
@@ -21,9 +23,18 @@ from poor_man_lakehouse.config import settings
 
 SQLEngine = Literal["pyspark", "duckdb"]
 WriteMode = Literal["append", "overwrite"]
+IcebergTableAspect = Literal["snapshots", "manifests", "column_stats", "partition_stats"]
 
 _SQL_ENGINES: set[str] = {"pyspark", "duckdb"}
 _WRITE_MODES: set[str] = {"append", "overwrite"}
+
+# DuckDB iceberg extension metadata functions; all accept an attached-catalog table name.
+_ASPECT_FUNCTIONS: dict[str, str] = {
+    "snapshots": "iceberg_snapshots",
+    "manifests": "iceberg_metadata",
+    "column_stats": "iceberg_column_stats",
+    "partition_stats": "iceberg_partition_stats",
+}
 
 
 class LakehouseConnection:
@@ -55,6 +66,11 @@ class LakehouseConnection:
         self._catalog_type = (catalog_type or settings.CATALOG).lower()
         self.catalog = get_catalog(self._catalog_type)  # type: ignore[arg-type]
         logger.debug(f"LakehouseConnection initialized (catalog_type={self._catalog_type})")
+
+    @staticmethod
+    def _fqn(namespace: str, table_name: str) -> str:
+        """Fully qualified table name in the attached DuckDB catalog."""
+        return f"{settings.CATALOG_NAME}.{namespace}.{table_name}"
 
     # -- Catalog browsing --
 
@@ -165,6 +181,77 @@ class LakehouseConnection:
         table = self.load_table(namespace, table_name)
         return table.scan().to_arrow()
 
+    def scan_duckdb(
+        self,
+        namespace: str,
+        table_name: str,
+        *,
+        snapshot_id: int | None = None,
+        as_of: datetime | str | None = None,
+    ) -> ir.Table:
+        """Scan an Iceberg table through DuckDB, optionally time-travelling.
+
+        Uses DuckDB's native `AT` clause on the attached catalog (iceberg
+        extension). Requires an attached catalog (lakekeeper, nessie, glue).
+
+        Args:
+            namespace: The namespace containing the table.
+            table_name: The table name.
+            snapshot_id: Read the table at this Iceberg snapshot id
+                (`AT (VERSION => ...)`). Mutually exclusive with as_of.
+            as_of: Read the table as of this timestamp (`AT (TIMESTAMP => ...)`).
+                Accepts a datetime or a string DuckDB can cast to TIMESTAMP.
+
+        Returns:
+            Ibis table expression over the (possibly historical) table state.
+
+        Raises:
+            ValueError: If both snapshot_id and as_of are provided.
+        """
+        if snapshot_id is not None and as_of is not None:
+            raise ValueError("'snapshot_id' and 'as_of' are mutually exclusive")
+
+        at_clause = ""
+        if snapshot_id is not None:
+            at_clause = f" AT (VERSION => {snapshot_id})"
+        elif as_of is not None:
+            ts = as_of.isoformat(sep=" ") if isinstance(as_of, datetime) else as_of
+            at_clause = f" AT (TIMESTAMP => TIMESTAMP '{ts}')"
+
+        return self.duckdb_connection.sql(f"SELECT * FROM {self._fqn(namespace, table_name)}{at_clause}")  # noqa: S608
+
+    def inspect_table(
+        self,
+        namespace: str,
+        table_name: str,
+        aspect: IcebergTableAspect = "snapshots",
+    ) -> ir.Table:
+        """Inspect Iceberg table metadata through DuckDB's native functions.
+
+        Complements the PyIceberg-based snapshot_history() with the iceberg
+        extension's metadata table functions, which also expose manifest-level
+        detail and file statistics.
+
+        Args:
+            namespace: The namespace containing the table.
+            table_name: The table name.
+            aspect: What to inspect — "snapshots" (iceberg_snapshots),
+                "manifests" (iceberg_metadata), "column_stats"
+                (iceberg_column_stats), or "partition_stats"
+                (iceberg_partition_stats).
+
+        Returns:
+            Ibis table expression with the requested metadata.
+
+        Raises:
+            ValueError: If aspect is not supported.
+        """
+        function = _ASPECT_FUNCTIONS.get(aspect)
+        if function is None:
+            raise ValueError(f"Unsupported aspect: '{aspect}'. Supported: {set(_ASPECT_FUNCTIONS)}")
+
+        return self.duckdb_connection.sql(f"SELECT * FROM {function}({self._fqn(namespace, table_name)})")  # noqa: S608
+
     # -- DuckDB engine --
 
     @cached_property
@@ -201,11 +288,15 @@ class LakehouseConnection:
                 "lakekeeper": settings.LAKEKEEPER_SERVER_URI,
                 "nessie": settings.NESSIE_REST_URI,
             }
+            # AUTHORIZATION_TYPE 'none' is the documented no-auth mode (TOKEN '' would
+            # send an empty Bearer header). Credential vending is on by default and,
+            # since duckdb-iceberg fixes #594/#792, carries MinIO endpoint + path-style
+            # through; the static secret above remains as fallback (Nessie requires it).
             con.raw_sql(f"""
                 ATTACH OR REPLACE '{settings.BUCKET_NAME}' AS {catalog_name} (
                     TYPE iceberg,
                     ENDPOINT '{uri_map[self._catalog_type]}',
-                    TOKEN ''
+                    AUTHORIZATION_TYPE 'none'
                 );
             """)
 
@@ -305,6 +396,23 @@ class LakehouseConnection:
 
         return self.ibis_pyspark().sql(query)
 
+    def execute(self, statement: str) -> None:
+        """Execute a SQL statement (no result) on the DuckDB engine.
+
+        Use this for DML/DDL against the attached Iceberg catalog — UPDATE,
+        DELETE, MERGE INTO, ALTER TABLE — which sql() cannot run: sql() returns
+        an ibis expression and ibis prepends DESCRIBE for schema inference,
+        which only works for queries.
+
+        Iceberg DML is merge-on-read: UPDATE/DELETE since DuckDB 1.4.2,
+        MERGE INTO and ALTER TABLE since 1.5.3.
+
+        Args:
+            statement: The SQL statement to execute.
+        """
+        self.duckdb_connection.raw_sql(statement)
+        logger.debug(f"Executed statement via DuckDB: {statement[:80]}")
+
     def write_table(
         self,
         namespace: str,
@@ -331,11 +439,10 @@ class LakehouseConnection:
         if data is None and query is None:
             raise ValueError("Either 'data' or 'query' must be provided")
 
-        catalog_name = settings.CATALOG_NAME
-        fqn = f"{catalog_name}.{namespace}.{table_name}"
+        fqn = self._fqn(namespace, table_name)
         con = self.duckdb_connection
 
-        con.raw_sql(f"USE {catalog_name}.{namespace};")
+        con.raw_sql(f"USE {settings.CATALOG_NAME}.{namespace};")
 
         if mode == "overwrite":
             con.raw_sql(f"DELETE FROM {fqn} WHERE true")  # noqa: S608
@@ -349,18 +456,83 @@ class LakehouseConnection:
 
         logger.info(f"Wrote to {fqn} (mode={mode}) via DuckDB")
 
-    def create_table(self, namespace: str, table_name: str, schema_sql: str) -> None:
+    def create_table(
+        self,
+        namespace: str,
+        table_name: str,
+        schema_sql: str,
+        *,
+        partition_by: str | None = None,
+        table_properties: Mapping[str, str] | None = None,
+    ) -> None:
         """Create an Iceberg table via DuckDB.
 
         Args:
             namespace: The namespace name.
             table_name: The table name.
             schema_sql: Column definitions, e.g. "id INTEGER, name VARCHAR".
+            partition_by: Iceberg partition spec, e.g. "day(event_time), bucket(16, id)".
+                Supports identity, year/month/day/hour, bucket, truncate transforms
+                (DuckDB 1.5.1+, bucket/truncate 1.5.3+).
+            table_properties: Iceberg table properties, e.g. {"format-version": "3"}
+                for Iceberg v3 (deletion vectors, VARIANT, column defaults).
         """
-        catalog_name = settings.CATALOG_NAME
-        fqn = f"{catalog_name}.{namespace}.{table_name}"
-        self.duckdb_connection.raw_sql(f"CREATE TABLE IF NOT EXISTS {fqn} ({schema_sql})")  # noqa: S608
+        fqn = self._fqn(namespace, table_name)
+        ddl = f"CREATE TABLE IF NOT EXISTS {fqn} ({schema_sql})"
+        if partition_by:
+            ddl += f" PARTITIONED BY ({partition_by})"
+        if table_properties:
+            props = ", ".join(f"'{key}' = '{value}'" for key, value in table_properties.items())
+            ddl += f" WITH ({props})"
+        self.duckdb_connection.raw_sql(ddl)
         logger.info(f"Created table {fqn}")
+
+    def create_table_as(
+        self,
+        namespace: str,
+        table_name: str,
+        *,
+        query: str | None = None,
+        data: ir.Table | None = None,
+    ) -> None:
+        """Create an Iceberg table from a query or Ibis expression (CTAS) via DuckDB.
+
+        Args:
+            namespace: The namespace name.
+            table_name: The table name.
+            query: SQL query whose results populate the table. Mutually exclusive with data.
+            data: Ibis table expression to materialize. Mutually exclusive with query.
+
+        Raises:
+            ValueError: Unless exactly one of query or data is provided.
+        """
+        if (query is None) == (data is None):
+            raise ValueError("Exactly one of 'query' or 'data' must be provided")
+
+        fqn = self._fqn(namespace, table_name)
+        con = self.duckdb_connection
+
+        if query is not None:
+            con.raw_sql(f"CREATE TABLE {fqn} AS {query}")  # noqa: S608
+        elif data is not None:
+            con.raw_sql(f"CREATE OR REPLACE TEMP VIEW _ctas_staging AS {data.compile()}")  # noqa: S608
+            con.raw_sql(f"CREATE TABLE {fqn} AS SELECT * FROM _ctas_staging")  # noqa: S608
+            con.raw_sql("DROP VIEW IF EXISTS _ctas_staging")
+
+        logger.info(f"Created table {fqn} (CTAS)")
+
+    def drop_table(self, namespace: str, table_name: str, *, if_exists: bool = True) -> None:
+        """Drop an Iceberg table via DuckDB.
+
+        Args:
+            namespace: The namespace name.
+            table_name: The table name.
+            if_exists: Do not error when the table does not exist.
+        """
+        fqn = self._fqn(namespace, table_name)
+        exists_clause = "IF EXISTS " if if_exists else ""
+        self.duckdb_connection.raw_sql(f"DROP TABLE {exists_clause}{fqn}")
+        logger.info(f"Dropped table {fqn}")
 
     # -- Lifecycle --
 

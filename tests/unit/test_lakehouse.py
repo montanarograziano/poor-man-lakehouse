@@ -284,6 +284,152 @@ class TestLakehouseConnectionWrite:
         assert "lakekeeper.default.users" in call_arg
 
 
+class TestLakehouseConnectionDuckDBIceberg:
+    """Tests for DuckDB-native Iceberg methods (time travel, metadata, DDL)."""
+
+    @staticmethod
+    def _conn_with_mock_duck(mock_settings=None):
+        from poor_man_lakehouse.lakehouse import LakehouseConnection
+
+        if mock_settings is not None:
+            mock_settings.CATALOG_NAME = "lakekeeper"
+        conn = LakehouseConnection()
+        mock_duck = MagicMock()
+        conn.__dict__["duckdb_connection"] = mock_duck
+        return conn, mock_duck
+
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_scan_duckdb_rejects_both_snapshot_and_timestamp(self, mock_get_catalog):
+        """Test scan_duckdb raises when snapshot_id and as_of are both given."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, _ = self._conn_with_mock_duck()
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            conn.scan_duckdb("default", "users", snapshot_id=1, as_of="2026-01-01")
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_scan_duckdb_plain(self, mock_get_catalog, mock_settings):
+        """Test scan_duckdb without time travel emits no AT clause."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.scan_duckdb("default", "users")
+        query = mock_duck.sql.call_args[0][0]
+        assert query == "SELECT * FROM lakekeeper.default.users"
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_scan_duckdb_snapshot_id(self, mock_get_catalog, mock_settings):
+        """Test scan_duckdb with snapshot_id emits AT (VERSION => ...)."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.scan_duckdb("default", "users", snapshot_id=42)
+        query = mock_duck.sql.call_args[0][0]
+        assert "AT (VERSION => 42)" in query
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_scan_duckdb_as_of_datetime(self, mock_get_catalog, mock_settings):
+        """Test scan_duckdb with a datetime emits AT (TIMESTAMP => ...)."""
+        from datetime import datetime
+
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.scan_duckdb("default", "users", as_of=datetime(2026, 1, 2, 3, 4, 5))  # noqa: DTZ001
+        query = mock_duck.sql.call_args[0][0]
+        assert "AT (TIMESTAMP => TIMESTAMP '2026-01-02 03:04:05')" in query
+
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_inspect_table_rejects_unknown_aspect(self, mock_get_catalog):
+        """Test inspect_table raises for unsupported aspects."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, _ = self._conn_with_mock_duck()
+        with pytest.raises(ValueError, match="Unsupported aspect"):
+            conn.inspect_table("default", "users", aspect="files")  # pyright: ignore[reportArgumentType]
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_inspect_table_aspect_functions(self, mock_get_catalog, mock_settings):
+        """Test inspect_table maps aspects to the iceberg extension functions."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        expected = {
+            "snapshots": "iceberg_snapshots",
+            "manifests": "iceberg_metadata",
+            "column_stats": "iceberg_column_stats",
+            "partition_stats": "iceberg_partition_stats",
+        }
+        for aspect, function in expected.items():
+            conn.inspect_table("default", "users", aspect=aspect)  # pyright: ignore[reportArgumentType]
+            query = mock_duck.sql.call_args[0][0]
+            assert f"{function}(lakekeeper.default.users)" in query
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_execute_delegates_to_raw_sql(self, mock_get_catalog, mock_settings):
+        """Test execute passes statements through raw_sql."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.execute("DELETE FROM lakekeeper.default.users WHERE id = 1")
+        mock_duck.raw_sql.assert_called_once_with("DELETE FROM lakekeeper.default.users WHERE id = 1")
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_create_table_with_partition_and_properties(self, mock_get_catalog, mock_settings):
+        """Test create_table emits PARTITIONED BY and WITH clauses."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.create_table(
+            "default",
+            "events",
+            "id BIGINT, event_time TIMESTAMP",
+            partition_by="day(event_time)",
+            table_properties={"format-version": "3"},
+        )
+        ddl = str(mock_duck.raw_sql.call_args)
+        assert "PARTITIONED BY (day(event_time))" in ddl
+        assert "WITH ('format-version' = '3')" in ddl
+
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_create_table_as_requires_exactly_one_source(self, mock_get_catalog):
+        """Test create_table_as raises unless exactly one of query/data is given."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, _ = self._conn_with_mock_duck()
+        with pytest.raises(ValueError, match="Exactly one"):
+            conn.create_table_as("default", "users")
+        with pytest.raises(ValueError, match="Exactly one"):
+            conn.create_table_as("default", "users", query="SELECT 1", data=MagicMock())
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_create_table_as_with_query(self, mock_get_catalog, mock_settings):
+        """Test create_table_as issues CREATE TABLE ... AS with the query."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.create_table_as("default", "users_copy", query="SELECT * FROM lakekeeper.default.users")
+        ddl = str(mock_duck.raw_sql.call_args)
+        assert "CREATE TABLE lakekeeper.default.users_copy AS SELECT * FROM" in ddl
+
+    @patch("poor_man_lakehouse.lakehouse.settings")
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_drop_table(self, mock_get_catalog, mock_settings):
+        """Test drop_table emits DROP TABLE IF EXISTS by default, plain DROP otherwise."""
+        mock_get_catalog.return_value = MagicMock()
+        conn, mock_duck = self._conn_with_mock_duck(mock_settings)
+
+        conn.drop_table("default", "users")
+        assert "DROP TABLE IF EXISTS lakekeeper.default.users" in str(mock_duck.raw_sql.call_args)
+
+        conn.drop_table("default", "users", if_exists=False)
+        assert "DROP TABLE lakekeeper.default.users" in str(mock_duck.raw_sql.call_args)
+
+
 class TestLakehouseConnectionIbis:
     """Tests for Ibis engine access methods."""
 
