@@ -88,13 +88,6 @@ class SparkBuilder(ABC):
 
         return builder
 
-    def _get_packages(self) -> list[str]:
-        """Get the list of Maven packages to include.
-
-        Subclasses can override to add additional packages.
-        """
-        return COMMON_PACKAGES.copy()
-
     def _configure_s3(self, builder: SparkSession.Builder) -> SparkSession.Builder:
         """Configure S3/Minio access settings.
 
@@ -164,8 +157,7 @@ class SparkBuilder(ABC):
         builder = self._create_base_builder()
         builder = self._configure_common(builder)
         builder = self._configure_catalog(builder)
-        extra_packages = self._get_packages()
-        return configure_spark_with_delta_pip(builder, extra_packages=extra_packages).getOrCreate()
+        return configure_spark_with_delta_pip(builder, extra_packages=COMMON_PACKAGES).getOrCreate()
 
 
 class PostgresCatalogSparkBuilder(SparkBuilder):

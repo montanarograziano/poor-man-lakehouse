@@ -25,8 +25,6 @@ class Settings(BaseSettings):
     )
 
     # Application Path
-    APP_NAME: str = "Poor Man Lakehouse"
-    PROJECT_NAME: str = "poor-man-lakehouse"
     REPO_PATH: str = str(Path.cwd())
 
     # Logger
@@ -38,12 +36,9 @@ class Settings(BaseSettings):
 
     # AWS Credentials
     AWS_DEFAULT_REGION: str = "eu-central-1"
-    AWS_REGION: str = ""
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_ENDPOINT_URL: str = "http://minio:9000"
-    MINIO_ENDPOINT: str = "http://minio:9000"
-    AWS_SESSION_TOKEN: str = ""  # not necessary locally
     S3_STORAGE_OPTIONS: dict = {}
     ICEBERG_STORAGE_OPTIONS: dict = {}
 
@@ -55,7 +50,6 @@ class Settings(BaseSettings):
 
     # Catalog settings
     CATALOG: str = "nessie"  # Options: "nessie", "lakekeeper", "postgres", "glue"
-    CATALOG_URI: str = "http://localhost:8080"
     CATALOG_NAME: str = "nessie"
     CATALOG_DEFAULT_SCHEMA: str = "default"
 
@@ -84,18 +78,6 @@ class Settings(BaseSettings):
     def WAREHOUSE_BUCKET(self) -> str:
         """Compute warehouse bucket URI from BUCKET_NAME."""
         return f"s3://{self.BUCKET_NAME}/"
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def SETTINGS_PATH(self) -> str:
-        """Compute settings path from REPO_PATH."""
-        return os.path.join(self.REPO_PATH, "settings")
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def LOG_FILE_PATH(self) -> str:
-        """Compute log file path from LOG_FOLDER and LOG_FILE_NAME."""
-        return os.path.join(self.log_folder_resolved, self.LOG_FILE_NAME)
 
     @property
     def log_folder_resolved(self) -> str:

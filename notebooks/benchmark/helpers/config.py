@@ -135,16 +135,6 @@ class RunSelection:
     engines: list[str]
     operations: list[str]
 
-    @classmethod
-    def all_from(cls, cfg: BenchmarkConfig) -> RunSelection:
-        """Return a selection covering everything defined in the config."""
-        return cls(
-            sizes=list(cfg.table_sizes.keys()),
-            storage_modes=cfg.default_storage_modes or cfg.storage_modes,
-            engines=list(cfg.engines),
-            operations=cfg.operations.all_operations,
-        )
-
 
 def load_config(config_path: str | Path) -> BenchmarkConfig:
     """Load benchmark configuration from YAML file.

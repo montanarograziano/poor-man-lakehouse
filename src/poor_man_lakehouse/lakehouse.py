@@ -335,14 +335,6 @@ class LakehouseConnection:
 
     # -- Ibis engine access --
 
-    def ibis_duckdb(self) -> DuckDBBackend:
-        """Get the DuckDB Ibis backend with catalog attached.
-
-        Returns:
-            DuckDB Ibis backend connection.
-        """
-        return self.duckdb_connection
-
     def ibis_polars(self, namespace: str, table_name: str) -> PolarsBackend:
         """Get a Polars Ibis backend with a table registered.
 
@@ -538,9 +530,7 @@ class LakehouseConnection:
 
     def close(self) -> None:
         """Close all active connections and clear cached properties."""
-        for prop in ("duckdb_connection",):
-            if prop in self.__dict__:
-                del self.__dict__[prop]
+        self.__dict__.pop("duckdb_connection", None)
         logger.debug("LakehouseConnection closed")
 
     def __enter__(self) -> Self:

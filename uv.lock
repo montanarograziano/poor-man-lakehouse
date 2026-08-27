@@ -1369,26 +1369,6 @@ wheels = [
 ]
 
 [[package]]
-name = "karva"
-version = "0.0.1a6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/25/f6/7d5b8e4b46f5c46be1056006d73426be647ec043e3faf3875f58d86730c6/karva-0.0.1a6.tar.gz", hash = "sha256:e422c9dc4608941cc8873328848dc2a6386e20eb7e957c3dd750eab32d2364d7", size = 273142, upload-time = "2026-06-14T17:57:48.191Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/b0/749a61b1199f5ed6d7d4589333c04680835844bad93a817ec3d0857d75b1/karva-0.0.1a6-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:9c1edf90bbf6c5867147c977fc3248f2b9119a48d4b4a85e343abfa2e09d4a5c", size = 4302027, upload-time = "2026-06-14T17:57:54.907Z" },
-    { url = "https://files.pythonhosted.org/packages/a0/12/b92781161f690dc45e3f933a431257300f49010d6ffba69ac5e8e556cd74/karva-0.0.1a6-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:03168ab18edf05a5197bb55cd11dae18b601d33e12179c86e2ea6474174027a4", size = 4202092, upload-time = "2026-06-14T17:57:43.807Z" },
-    { url = "https://files.pythonhosted.org/packages/43/1f/3b2bf70bda896bacea131fe9db560f80e7bd05a59e2289495504b7abf1ec/karva-0.0.1a6-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7d8a81cd69c213ebb6be6f82458ad137cb89238ebfe9d5b6dbb7f838ee052ea9", size = 4616633, upload-time = "2026-06-14T17:57:53.53Z" },
-    { url = "https://files.pythonhosted.org/packages/05/fe/fe0771065f04c84d223cfa8de3d7493320c47ea657c86e9d87d473fca3b4/karva-0.0.1a6-cp310-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:3b1ffbab2fbc099070ec1a92686354f4e469af2dfddaae45d540a5ae531949f2", size = 4558645, upload-time = "2026-06-14T17:58:00.251Z" },
-    { url = "https://files.pythonhosted.org/packages/84/ab/0c92138e9b2495ef94d39b3f241225a9772a118dbbcbef04b963ad96c072/karva-0.0.1a6-cp310-abi3-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:972de8264c489097d20c89bcccb954de69f0b4dd2553fbb7515baf8b535d45b2", size = 5030543, upload-time = "2026-06-14T17:57:49.2Z" },
-    { url = "https://files.pythonhosted.org/packages/67/89/4a69f7d1b56f23b5c1b939d327c4cd1dd08923c9cdc862a8123d967a9357/karva-0.0.1a6-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0b8528611ac5719df78face06a7dfa54faf51a4f77509435fce96c11bd745f05", size = 4659166, upload-time = "2026-06-14T17:57:50.84Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/39/227896ea6230aa2a7695d7dcf1271d5549100234f75223ce1baf0cf28b6c/karva-0.0.1a6-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:aa3beea6efe5b0d1e964bdf8d8df9a563b822a976df1beca18c4a59682745ed6", size = 4792497, upload-time = "2026-06-14T17:57:52.239Z" },
-    { url = "https://files.pythonhosted.org/packages/90/b8/9e89ff191825d8b19205077e9927ac71c2fe930de96c0a32f06559757217/karva-0.0.1a6-cp310-abi3-musllinux_1_2_armv7l.whl", hash = "sha256:9bf9316bbb1b16e2bf4248f015e67b55b35ead9cef6a6787942bd05b69f4bc89", size = 4827166, upload-time = "2026-06-14T17:57:56.106Z" },
-    { url = "https://files.pythonhosted.org/packages/3a/cc/40d7c0a80917b0e70d4500df58ed455fd334c45000a06b76bc8e07b0273c/karva-0.0.1a6-cp310-abi3-musllinux_1_2_i686.whl", hash = "sha256:a0a51f74ac4f87e1efb89f94cd6b2b2e899a5d5f858c789778212333f1f5c04f", size = 5022935, upload-time = "2026-06-14T17:57:45.19Z" },
-    { url = "https://files.pythonhosted.org/packages/9f/6f/7db5839351880cf1424b51e41bcedc6bba0be0c58f4d2e877511fb324c47/karva-0.0.1a6-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:8f1cce5afe1ed5c9f492176859c1547df9905b9b8ae0cd0cf7cd112af41a43f0", size = 4955620, upload-time = "2026-06-14T17:57:57.367Z" },
-    { url = "https://files.pythonhosted.org/packages/e6/58/b7e1eb1109d8d73a181564fcf1e9bb018f0968433928283c7ecdabdccf4a/karva-0.0.1a6-cp310-abi3-win32.whl", hash = "sha256:3c60d9f4e0190f742beaeb18362183e7b9534de2eff0f1ecfa3e40716504b37c", size = 3671679, upload-time = "2026-06-14T17:57:58.734Z" },
-    { url = "https://files.pythonhosted.org/packages/64/9f/c81b85e855978515390e61f5bf4b9f7e85c3b2d090aeb9e234f0624fd067/karva-0.0.1a6-cp310-abi3-win_amd64.whl", hash = "sha256:b53bf67fb6819fda1b9c45ec11f63312b3e4d753fe7e0e85e9a206c2ebfe83d9", size = 3969690, upload-time = "2026-06-14T17:57:46.815Z" },
-]
-
-[[package]]
 name = "lark"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2110,7 +2090,6 @@ dev = [
     { name = "deptry" },
     { name = "ipykernel" },
     { name = "jupyterlab" },
-    { name = "karva" },
     { name = "marimo" },
     { name = "mypy" },
     { name = "prek" },
@@ -2119,7 +2098,6 @@ dev = [
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
-    { name = "pytz" },
     { name = "pyyaml" },
     { name = "ruff" },
     { name = "testcontainers" },
@@ -2149,7 +2127,6 @@ dev = [
     { name = "deptry", specifier = ">=0.23.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "jupyterlab", specifier = ">=4.0.0" },
-    { name = "karva", specifier = ">=0.0.1a4" },
     { name = "marimo", specifier = ">=0.23.2" },
     { name = "mypy", specifier = ">=1.16.0" },
     { name = "prek", specifier = ">=0.2.12" },
@@ -2158,7 +2135,6 @@ dev = [
     { name = "pyright", specifier = ">=1.1.390" },
     { name = "pytest", specifier = ">=8.4.0" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
-    { name = "pytz", specifier = ">=2026.1.post1" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.15.0" },
     { name = "testcontainers", specifier = ">=4.14.2" },
@@ -2678,15 +2654,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl", hash = "sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23", size = 30042, upload-time = "2026-06-04T16:18:57.319Z" },
-]
-
-[[package]]
-name = "pytz"
-version = "2026.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ff/46/dd499ec9038423421951e4fad73051febaa13d2df82b4064f87af8b8c0c3/pytz-2026.2.tar.gz", hash = "sha256:0e60b47b29f21574376f218fe21abc009894a2321ea16c6754f3cad6eb7cdd6a", size = 320861, upload-time = "2026-05-04T01:35:29.667Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/dd/96da98f892250475bdf2328112d7468abdd4acc7b902b6af23f4ed958ea0/pytz-2026.2-py2.py3-none-any.whl", hash = "sha256:04156e608bee23d3792fd45c94ae47fae1036688e75032eea2e3bf0323d1f126", size = 510141, upload-time = "2026-05-04T01:35:27.408Z" },
 ]
 
 [[package]]

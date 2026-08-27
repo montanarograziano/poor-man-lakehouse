@@ -88,14 +88,6 @@ class TestSparkBuilderBase:
         builder = PostgresCatalogSparkBuilder(app_name="Custom App")
         assert builder._app_name == "Custom App"
 
-    def test_get_packages_returns_common_packages(self):
-        """Test _get_packages returns a copy of COMMON_PACKAGES."""
-        builder = PostgresCatalogSparkBuilder()
-        packages = builder._get_packages()
-        assert packages == COMMON_PACKAGES
-        # Should be a copy, not the same list
-        assert packages is not COMMON_PACKAGES
-
     @patch("poor_man_lakehouse.spark_connector.builder.settings")
     def test_catalog_name_property(self, mock_settings):
         """Test catalog_name property returns settings.CATALOG_NAME."""
