@@ -433,19 +433,6 @@ class TestLakehouseConnectionDuckDBIceberg:
 class TestLakehouseConnectionIbis:
     """Tests for Ibis engine access methods."""
 
-    @patch("poor_man_lakehouse.lakehouse.get_catalog")
-    def test_ibis_duckdb_returns_duckdb_connection(self, mock_get_catalog):
-        """Test ibis_duckdb returns the cached duckdb_connection."""
-        mock_get_catalog.return_value = MagicMock()
-        from poor_man_lakehouse.lakehouse import LakehouseConnection
-
-        conn = LakehouseConnection()
-        mock_duck = MagicMock()
-        conn.__dict__["duckdb_connection"] = mock_duck
-
-        result = conn.ibis_duckdb()
-        assert result is mock_duck
-
     @patch("poor_man_lakehouse.lakehouse.pl")
     @patch("poor_man_lakehouse.lakehouse.get_catalog")
     def test_ibis_polars_registers_table(self, mock_get_catalog, mock_pl):

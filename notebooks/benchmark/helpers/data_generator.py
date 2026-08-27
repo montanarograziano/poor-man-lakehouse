@@ -8,7 +8,6 @@ Public API:
     - ``StreamingGenerator(spec)``: single-use producer. Each instance must be consumed exactly
       once; instantiate a fresh one per benchmark run.
     - ``StreamingGenerator.iter_batches() -> Iterator[pa.RecordBatch]``: streamed primary data.
-    - ``StreamingGenerator.iter_polars() -> Iterator[pl.DataFrame]``: zero-copy Polars adapter.
     - ``StreamingGenerator.arrow_reader() -> pa.RecordBatchReader``: zero-copy reader for
       ``write_deltalake`` and DuckDB ``INSERT INTO ... SELECT * FROM <reader>``.
     - ``StreamingGenerator.iter_merge_batches(overlap_ratio)``: merge source data with crafted IDs.
@@ -22,7 +21,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 import numpy as np
-import polars as pl
 import pyarrow as pa
 
 from .config import ColumnDef, SchemaConfig
@@ -258,11 +256,6 @@ class StreamingGenerator:
             n = min(self.spec.chunk_size, self.spec.total_rows - rows_done)
             yield self._chunk(n, rows_done, np.random.default_rng(sub_seed))
             rows_done += n
-
-    def iter_polars(self) -> Iterator[pl.DataFrame]:
-        """Yield Polars frames (zero-copy for primitives)."""
-        for batch in self.iter_batches():
-            yield pl.from_arrow(batch)  # type: ignore[misc]
 
     def arrow_reader(self) -> pa.RecordBatchReader:
         """Expose primary data as a single-pass ``pa.RecordBatchReader``."""

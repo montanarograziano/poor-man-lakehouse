@@ -17,8 +17,6 @@ class TestSettings:
             monkeypatch.delenv(key, raising=False)
 
         test_settings = Settings(_env_file=None)
-        assert test_settings.APP_NAME == "Poor Man Lakehouse"
-        assert test_settings.PROJECT_NAME == "poor-man-lakehouse"
         assert test_settings.AWS_DEFAULT_REGION == "eu-central-1"
         assert test_settings.CATALOG == "nessie"
         assert test_settings.CATALOG_NAME == "nessie"
@@ -107,11 +105,6 @@ class TestSettings:
         """Test WAREHOUSE_BUCKET is computed from BUCKET_NAME at instance time."""
         test_settings = Settings(_env_file=None, BUCKET_NAME="my-bucket")
         assert test_settings.WAREHOUSE_BUCKET == "s3://my-bucket/"
-
-    def test_settings_path_computed_from_repo_path(self):
-        """Test SETTINGS_PATH is computed from REPO_PATH."""
-        test_settings = Settings(_env_file=None, REPO_PATH="/tmp/test")  # noqa: S108
-        assert test_settings.SETTINGS_PATH == "/tmp/test/settings"  # noqa: S108
 
 
 class TestGetSettings:

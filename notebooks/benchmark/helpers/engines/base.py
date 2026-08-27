@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from ..config import BenchmarkConfig
 
 
-@runtime_checkable
 class BenchmarkEngine(Protocol):
     """Protocol defining the benchmark engine interface.
 
