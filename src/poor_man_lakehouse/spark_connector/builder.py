@@ -14,6 +14,7 @@ from delta import configure_spark_with_delta_pip
 from loguru import logger
 from pyspark.sql import SparkSession
 
+from poor_man_lakehouse.catalog import _VALID_CATALOG_TYPES, LakehouseCatalogType
 from poor_man_lakehouse.config import settings
 
 SCALA_VERSION = "2.13"
@@ -31,7 +32,12 @@ COMMON_PACKAGES: list[str] = [
 
 
 class CatalogType(str, Enum):
-    """Supported catalog types."""
+    """Supported catalog types.
+
+    .. deprecated::
+        Use :data:`~poor_man_lakehouse.catalog.LakehouseCatalogType` instead.
+        This enum is kept for backward compatibility.
+    """
 
     POSTGRES = "postgres"
     NESSIE = "nessie"
@@ -336,19 +342,20 @@ class GlueCatalogSparkBuilder(SparkBuilder):
         return spark
 
 
-_CATALOG_BUILDERS: dict[CatalogType, type[SparkBuilder]] = {
-    CatalogType.POSTGRES: PostgresCatalogSparkBuilder,
-    CatalogType.NESSIE: NessieCatalogSparkBuilder,
-    CatalogType.LAKEKEEPER: LakekeeperCatalogSparkBuilder,
-    CatalogType.GLUE: GlueCatalogSparkBuilder,
+_CATALOG_BUILDERS: dict[str, type[SparkBuilder]] = {
+    "postgres": PostgresCatalogSparkBuilder,
+    "nessie": NessieCatalogSparkBuilder,
+    "lakekeeper": LakekeeperCatalogSparkBuilder,
+    "glue": GlueCatalogSparkBuilder,
 }
 
 
-def get_spark_builder(catalog_type: CatalogType | str) -> SparkBuilder:
+def get_spark_builder(catalog_type: LakehouseCatalogType | CatalogType | str) -> SparkBuilder:
     """Get the appropriate Spark builder for the given catalog type.
 
     Args:
-        catalog_type: The catalog type (enum or string).
+        catalog_type: The catalog type — a LakehouseCatalogType literal string,
+            a CatalogType enum member (deprecated), or a plain string.
 
     Returns:
         An instance of the appropriate SparkBuilder subclass.
@@ -356,17 +363,13 @@ def get_spark_builder(catalog_type: CatalogType | str) -> SparkBuilder:
     Raises:
         ValueError: If the catalog type is not supported.
     """
-    if isinstance(catalog_type, str):
-        try:
-            catalog_type = CatalogType(catalog_type)
-        except ValueError as e:
-            supported = [c.value for c in CatalogType]
-            raise ValueError(f"Unsupported catalog: {catalog_type}. Supported: {supported}") from e
+    resolved = catalog_type.value if isinstance(catalog_type, CatalogType) else catalog_type
+    if resolved not in _VALID_CATALOG_TYPES:
+        raise ValueError(f"Unsupported catalog: {resolved}. Supported: {sorted(_VALID_CATALOG_TYPES)}")
 
-    builder_class = _CATALOG_BUILDERS.get(catalog_type)
+    builder_class = _CATALOG_BUILDERS.get(resolved)
     if builder_class is None:
-        supported = [c.value for c in CatalogType]
-        raise ValueError(f"Unsupported catalog: {catalog_type}. Supported: {supported}")
+        raise ValueError(f"Unsupported catalog: {resolved}. Supported: {sorted(_VALID_CATALOG_TYPES)}")
 
     return builder_class()
 
