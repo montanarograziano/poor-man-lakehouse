@@ -3,6 +3,12 @@
 from poor_man_lakehouse.catalog import LakehouseCatalogType, get_catalog
 from poor_man_lakehouse.config import Settings, get_settings, reload_settings, settings
 from poor_man_lakehouse.lakehouse import LakehouseConnection
+from poor_man_lakehouse.maintenance import (
+    ExpireSnapshotsPlan,
+    MaintenanceResult,
+    TableHealth,
+    TableMaintenance,
+)
 
 __all__ = [
     # Catalog
@@ -15,6 +21,11 @@ __all__ = [
     "settings",
     # Connectors
     "LakehouseConnection",
+    # Maintenance
+    "ExpireSnapshotsPlan",
+    "MaintenanceResult",
+    "TableHealth",
+    "TableMaintenance",
     # Spark (lazy — avoids eager PySpark/Delta import)
     "CatalogType",
     "get_spark_builder",
