@@ -102,10 +102,10 @@ class TestTableMaintenance:
     """Tests for TableMaintenance construction."""
 
     def test_table_name_from_tuple(self):
-        """Test table_name extracts last element from tuple."""
+        """Test table_name joins tuple components with dot."""
         table = _make_mock_table()
         m = TableMaintenance(table)
-        assert m.table_name == "test_table"
+        assert m.table_name == "default.test_table"
 
     def test_table_name_from_string(self):
         """Test table_name handles string name."""
@@ -184,7 +184,7 @@ class TestInspectMetadata:
         result = m.inspect_metadata()
 
         assert result["format_version"] == 2
-        assert result["table_name"] == "test_table"
+        assert result["table_name"] == "default.test_table"
         assert len(result["snapshot_history"]) == 1
         assert result["snapshot_history"][0]["snapshot_id"] == 1
         assert len(result["current_schema"]) == 1
@@ -298,6 +298,78 @@ class TestExpireSnapshots:
         ids = [s["snapshot_id"] for s in result.snapshots_to_expire]
         assert 10 in ids
         assert 20 in ids
+
+    # -- Regression tests for evaluator bugs --
+
+    def test_negative_older_than_days_raises(self):
+        """Regression: negative older_than_days must raise ValueError."""
+        table = _make_mock_table()
+        m = TableMaintenance(table)
+        with pytest.raises(ValueError, match="non-negative"):
+            m.expire_snapshots(older_than_days=-1, dry_run=True)
+
+    def test_naive_datetime_does_not_crash(self):
+        """Regression: naive older_than datetime must not raise TypeError."""
+        old_ts = int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+        current_ts = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        old_snap = _make_snapshot(snapshot_id=1, timestamp_ms=old_ts)
+        current_snap = _make_snapshot(snapshot_id=2, timestamp_ms=current_ts)
+        table = _make_mock_table(snapshots=[old_snap, current_snap], current_snapshot=current_snap)
+
+        m = TableMaintenance(table)
+        # Pass a naive datetime (no tz) — should NOT raise TypeError
+        result = m.expire_snapshots(older_than=datetime(2025, 1, 1), dry_run=True)  # noqa: DTZ001
+        assert isinstance(result, ExpireSnapshotsPlan)
+        assert len(result.snapshots_to_expire) == 1
+
+    def test_empty_snapshot_ids_raises(self):
+        """Regression: snapshot_ids=[] with dry_run=False must raise ValueError."""
+        table = _make_mock_table()
+        m = TableMaintenance(table)
+        with pytest.raises(ValueError, match="At least one of"):
+            m.expire_snapshots(snapshot_ids=[], dry_run=False)
+
+    def test_ref_protected_snapshots_excluded(self):
+        """Regression: snapshots referenced by branches/tags are excluded from plan."""
+        old_ts = int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+        snap_tagged = _make_snapshot(snapshot_id=10, timestamp_ms=old_ts)
+        snap_free = _make_snapshot(snapshot_id=11, timestamp_ms=old_ts)
+        current_snap = _make_snapshot(
+            snapshot_id=20, timestamp_ms=int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        )
+
+        # Simulate a tag ref pointing to snapshot 10
+        mock_ref = MagicMock()
+        mock_ref.snapshot_id = 10
+        mock_ref.snapshot_ref_type = "tag"
+
+        table = _make_mock_table(
+            snapshots=[snap_tagged, snap_free, current_snap],
+            current_snapshot=current_snap,
+            refs={"v1.0": mock_ref},
+        )
+
+        m = TableMaintenance(table)
+        result = m.expire_snapshots(older_than_days=1, dry_run=True)
+
+        assert isinstance(result, ExpireSnapshotsPlan)
+        expired_ids = [s["snapshot_id"] for s in result.snapshots_to_expire]
+        assert 10 not in expired_ids  # protected by tag
+        assert 11 in expired_ids  # not protected
+
+    def test_large_snapshot_ids_set_performance(self):
+        """Regression: large snapshot_ids list uses set lookups (no error)."""
+        # Create many snapshots
+        current_snap = _make_snapshot(snapshot_id=0, timestamp_ms=9999999)
+        snaps = [_make_snapshot(snapshot_id=i, timestamp_ms=i * 1000) for i in range(1, 1001)]
+        table = _make_mock_table(snapshots=snaps + [current_snap], current_snapshot=current_snap)
+
+        m = TableMaintenance(table)
+        ids_to_expire = list(range(1, 501))
+        result = m.expire_snapshots(snapshot_ids=ids_to_expire, dry_run=True)
+
+        assert isinstance(result, ExpireSnapshotsPlan)
+        assert len(result.snapshots_to_expire) == 500
 
 
 class TestUnsupportedOperations:

@@ -99,8 +99,17 @@ class TableMaintenance:
 
     @property
     def table_name(self) -> str:
-        """Fully qualified table name."""
-        return self._table.name()[-1] if isinstance(self._table.name(), tuple) else str(self._table.name())
+        """Table name as returned by PyIceberg.
+
+        For catalog-loaded tables this is typically the last component
+        (e.g. ``"events"``); for a fully qualified identifier pass-through
+        it may be a dotted string.  Use ``LakehouseConnection.load_table``
+        which already qualifies as ``namespace.table``.
+        """
+        name = self._table.name()
+        if isinstance(name, tuple):
+            return ".".join(name)
+        return str(name)
 
     def table_health(self) -> TableHealth:
         """Compute a read-only health summary of the table.
@@ -242,36 +251,55 @@ class TableMaintenance:
             ValueError: If no expiration criteria provided, or if conflicting
                 time-based arguments given.
         """
+        # --- Input validation ---
         if older_than_days is not None and older_than is not None:
             raise ValueError("'older_than_days' and 'older_than' are mutually exclusive")
-        if older_than_days is None and older_than is None and snapshot_ids is None:
+        if older_than_days is not None and older_than_days < 0:
+            raise ValueError(f"'older_than_days' must be non-negative, got {older_than_days}")
+
+        # Treat empty snapshot_ids as "no criteria" (Bug #4)
+        effective_ids: set[int] | None = None
+        if snapshot_ids is not None:
+            effective_ids = set(snapshot_ids) if snapshot_ids else None
+
+        has_criteria = older_than_days is not None or older_than is not None or effective_ids is not None
+        if not has_criteria:
             raise ValueError("At least one of 'older_than_days', 'older_than', or 'snapshot_ids' must be provided")
 
+        # --- Compute cutoff datetime ---
         cutoff: datetime | None = None
         if older_than_days is not None:
-            cutoff = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             from datetime import timedelta
 
+            cutoff = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             cutoff = cutoff - timedelta(days=older_than_days)
         elif older_than is not None:
-            cutoff = older_than
+            # Normalize naive datetimes to UTC (Bug #3)
+            cutoff = older_than if older_than.tzinfo is not None else older_than.replace(tzinfo=timezone.utc)
 
-        # Identify snapshots to expire
+        # --- Gather protected snapshot IDs ---
         metadata = self._table.metadata
         all_snapshots = metadata.snapshots or []
         current_snap = self._table.current_snapshot()
         current_id = current_snap.snapshot_id if current_snap else None
 
+        # Snapshots referenced by branches/tags are protected (Bug #1)
+        protected_ids: set[int] = set()
+        if current_id is not None:
+            protected_ids.add(current_id)
+        for ref in (metadata.refs or {}).values():
+            protected_ids.add(ref.snapshot_id)
+
+        # --- Select candidates ---
         candidates: list[dict[str, Any]] = []
         candidate_ids: list[int] = []
 
         for snap in all_snapshots:
-            # Never expire the current snapshot
-            if snap.snapshot_id == current_id:
+            if snap.snapshot_id in protected_ids:
                 continue
 
             should_expire = False
-            if snapshot_ids is not None and snap.snapshot_id in snapshot_ids:
+            if effective_ids is not None and snap.snapshot_id in effective_ids:
                 should_expire = True
             elif cutoff is not None:
                 snap_dt = datetime.fromtimestamp(snap.timestamp_ms / 1000, tz=timezone.utc)
