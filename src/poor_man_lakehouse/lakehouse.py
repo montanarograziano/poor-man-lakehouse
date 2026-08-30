@@ -4,19 +4,21 @@ Provides catalog browsing, native scans (Polars/Arrow), DuckDB engine access,
 and Ibis multi-engine wrappers — all backed by a single PyIceberg catalog.
 """
 
-from collections.abc import Mapping
+from __future__ import annotations
+
+from collections.abc import Mapping  # noqa: TC003
 from datetime import datetime
 from functools import cached_property
 from typing import Literal, Self
 
-import ibis.expr.types as ir
+import ibis.expr.types as ibis_types  # noqa: TC002
 import polars as pl
-import pyarrow as pa
-from ibis.backends.duckdb import Backend as DuckDBBackend
-from ibis.backends.polars import Backend as PolarsBackend
-from ibis.backends.pyspark import Backend as PySparkBackend
+import pyarrow as pa  # noqa: TC002
+from ibis.backends.duckdb import Backend as DuckDBBackend  # noqa: TC002
+from ibis.backends.polars import Backend as PolarsBackend  # noqa: TC002
+from ibis.backends.pyspark import Backend as PySparkBackend  # noqa: TC002
 from loguru import logger
-from pyiceberg.table import Table
+from pyiceberg.table import Table  # noqa: TC002
 
 from poor_man_lakehouse.catalog import LakehouseCatalogType, get_catalog
 from poor_man_lakehouse.config import settings
@@ -179,7 +181,7 @@ class LakehouseConnection:
             PyArrow Table.
         """
         table = self.load_table(namespace, table_name)
-        return table.scan().to_arrow()
+        return table.scan().to_arrow()  # pyarrow imported by pyiceberg at runtime
 
     def scan_duckdb(
         self,
@@ -188,7 +190,7 @@ class LakehouseConnection:
         *,
         snapshot_id: int | None = None,
         as_of: datetime | str | None = None,
-    ) -> ir.Table:
+    ) -> ibis_types.Table:
         """Scan an Iceberg table through DuckDB, optionally time-travelling.
 
         Uses DuckDB's native `AT` clause on the attached catalog (iceberg
@@ -225,7 +227,7 @@ class LakehouseConnection:
         namespace: str,
         table_name: str,
         aspect: IcebergTableAspect = "snapshots",
-    ) -> ir.Table:
+    ) -> ibis_types.Table:
         """Inspect Iceberg table metadata through DuckDB's native functions.
 
         Complements the PyIceberg-based snapshot_history() with the iceberg
@@ -367,7 +369,7 @@ class LakehouseConnection:
 
     # -- SQL & write operations --
 
-    def sql(self, query: str, engine: SQLEngine = "duckdb") -> ir.Table:
+    def sql(self, query: str, engine: SQLEngine = "duckdb") -> ibis_types.Table:
         """Execute a SQL query using the specified engine.
 
         Args:
@@ -410,7 +412,7 @@ class LakehouseConnection:
         namespace: str,
         table_name: str,
         *,
-        data: ir.Table | None = None,
+        data: ibis_types.Table | None = None,
         query: str | None = None,
         mode: WriteMode = "append",
     ) -> None:
@@ -424,12 +426,12 @@ class LakehouseConnection:
             mode: Write mode — "append" or "overwrite".
 
         Raises:
-            ValueError: If mode is invalid or neither data nor query is provided.
+            ValueError: If mode is invalid or not exactly one of data/query is provided.
         """
         if mode not in _WRITE_MODES:
             raise ValueError(f"Unsupported write mode: '{mode}'. Supported: {_WRITE_MODES}")
-        if data is None and query is None:
-            raise ValueError("Either 'data' or 'query' must be provided")
+        if (data is None) == (query is None):
+            raise ValueError("Exactly one of 'data' or 'query' must be provided")
 
         fqn = self._fqn(namespace, table_name)
         con = self.duckdb_connection
@@ -485,7 +487,7 @@ class LakehouseConnection:
         table_name: str,
         *,
         query: str | None = None,
-        data: ir.Table | None = None,
+        data: ibis_types.Table | None = None,
     ) -> None:
         """Create an Iceberg table from a query or Ibis expression (CTAS) via DuckDB.
 
