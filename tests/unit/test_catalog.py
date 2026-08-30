@@ -114,6 +114,10 @@ class TestGetCatalogGlue:
         mock_settings.AWS_DEFAULT_REGION = "us-east-1"
         mock_settings.WAREHOUSE_BUCKET = "s3://my-data-lake/"
         mock_settings.GLUE_CATALOG_ID = ""
+        mock_settings.ICEBERG_STORAGE_OPTIONS = {
+            "s3.region": "us-east-1",
+            "warehouse": "s3://my-data-lake/",
+        }
         mock_load_catalog.return_value = MagicMock()
 
         from poor_man_lakehouse.catalog import get_catalog
@@ -135,6 +139,11 @@ class TestGetCatalogGlue:
         mock_settings.AWS_DEFAULT_REGION = "us-east-1"
         mock_settings.WAREHOUSE_BUCKET = "s3://my-data-lake/"
         mock_settings.GLUE_CATALOG_ID = "123456789012"
+        mock_settings.ICEBERG_STORAGE_OPTIONS = {
+            "s3.region": "us-east-1",
+            "warehouse": "s3://my-data-lake/",
+            "glue.id": "123456789012",
+        }
         mock_load_catalog.return_value = MagicMock()
 
         from poor_man_lakehouse.catalog import get_catalog

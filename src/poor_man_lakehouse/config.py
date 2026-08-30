@@ -105,7 +105,7 @@ class Settings(BaseSettings):
         if self.CATALOG == "glue":
             self.ICEBERG_STORAGE_OPTIONS = {
                 "s3.region": self.AWS_DEFAULT_REGION,
-                "warehouse": self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
+                "warehouse": self.WAREHOUSE_BUCKET,
             }
             if self.GLUE_CATALOG_ID:
                 self.ICEBERG_STORAGE_OPTIONS["glue.id"] = self.GLUE_CATALOG_ID
@@ -115,9 +115,7 @@ class Settings(BaseSettings):
                 "s3.access-key-id": self.AWS_ACCESS_KEY_ID,
                 "s3.secret-access-key": self.AWS_SECRET_ACCESS_KEY,
                 "s3.region": self.AWS_DEFAULT_REGION,
-                "warehouse": self.LAKEKEEPER_WAREHOUSE
-                if self.CATALOG == "lakekeeper"
-                else self.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
+                "warehouse": self.LAKEKEEPER_WAREHOUSE if self.CATALOG == "lakekeeper" else self.WAREHOUSE_BUCKET,
             }
 
     def _setup_logger(self) -> None:
@@ -173,5 +171,5 @@ def reload_settings() -> Settings:
     return get_settings()
 
 
-# default settings with initialization
+# Default settings with initialization
 settings = get_settings()

@@ -16,10 +16,7 @@ def mock_settings():
         mock_instance = MagicMock()
 
         # Application settings
-        mock_instance.APP_NAME = "Poor Man Lakehouse"
-        mock_instance.PROJECT_NAME = "poor-man-lakehouse"
         mock_instance.REPO_PATH = "/tmp/test-repo"  # noqa: S108
-        mock_instance.SETTINGS_PATH = "/tmp/test-repo/settings"  # noqa: S108
 
         # Logger settings
         mock_instance.LOG_VERBOSITY = "DEBUG"
@@ -33,11 +30,8 @@ def mock_settings():
         mock_instance.AWS_SECRET_ACCESS_KEY = "test-secret-key"  # noqa: S105
         mock_instance.AWS_ENDPOINT_URL = "http://localhost:9000"
         mock_instance.AWS_DEFAULT_REGION = "eu-central-1"
-        mock_instance.AWS_REGION = "eu-central-1"
-        mock_instance.AWS_SESSION_TOKEN = ""
-        mock_instance.MINIO_ENDPOINT = "http://localhost:9000"
         mock_instance.BUCKET_NAME = "warehouse"
-        mock_instance.WAREHOUSE_BUCKET = "s3a://warehouse/"
+        mock_instance.WAREHOUSE_BUCKET = "s3://warehouse/"
 
         # Storage options (populated by model_validator _initialize)
         mock_instance.S3_STORAGE_OPTIONS = {
@@ -65,7 +59,6 @@ def mock_settings():
 
         # Catalog settings
         mock_instance.CATALOG = "nessie"
-        mock_instance.CATALOG_URI = "http://localhost:8080"
         mock_instance.CATALOG_NAME = "nessie"
         mock_instance.CATALOG_DEFAULT_SCHEMA = "default"
 
