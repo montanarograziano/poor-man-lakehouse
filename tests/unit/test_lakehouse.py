@@ -228,8 +228,18 @@ class TestLakehouseConnectionWrite:
         from poor_man_lakehouse.lakehouse import LakehouseConnection
 
         conn = LakehouseConnection()
-        with pytest.raises(ValueError, match="Either 'data' or 'query' must be provided"):
+        with pytest.raises(ValueError, match="Exactly one of 'data' or 'query' must be provided"):
             conn.write_table("default", "test")
+
+    @patch("poor_man_lakehouse.lakehouse.get_catalog")
+    def test_write_table_raises_when_both_data_and_query(self, mock_get_catalog):
+        """Test write_table raises when both data and query are provided."""
+        mock_get_catalog.return_value = MagicMock()
+        from poor_man_lakehouse.lakehouse import LakehouseConnection
+
+        conn = LakehouseConnection()
+        with pytest.raises(ValueError, match="Exactly one of 'data' or 'query' must be provided"):
+            conn.write_table("default", "test", data=MagicMock(), query="SELECT 1")
 
     @patch("poor_man_lakehouse.lakehouse.settings")
     @patch("poor_man_lakehouse.lakehouse.get_catalog")
@@ -250,7 +260,7 @@ class TestLakehouseConnectionWrite:
 
     @patch("poor_man_lakehouse.lakehouse.settings")
     @patch("poor_man_lakehouse.lakehouse.get_catalog")
-    def test_write_table_overwrite_deletes_first(self, mock_get_catalog, mock_settings):
+    def test_write_table_overwrite_deletes_then_inserts(self, mock_get_catalog, mock_settings):
         """Test write_table in overwrite mode deletes before inserting."""
         mock_settings.CATALOG_NAME = "lakekeeper"
         mock_get_catalog.return_value = MagicMock()
