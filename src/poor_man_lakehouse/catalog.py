@@ -77,12 +77,10 @@ def _build_postgres_config() -> dict[str, str]:
 
 
 def _build_glue_config() -> dict[str, str]:
-    """Build config for AWS Glue catalog."""
-    config: dict[str, str] = {
-        "type": "glue",
-        "s3.region": settings.AWS_DEFAULT_REGION,
-        "warehouse": settings.WAREHOUSE_BUCKET.replace("s3a://", "s3://"),
-    }
-    if settings.GLUE_CATALOG_ID:
-        config["glue.id"] = settings.GLUE_CATALOG_ID
-    return config
+    """Build config for AWS Glue catalog.
+
+    Reuses settings.ICEBERG_STORAGE_OPTIONS (populated for Glue by
+    config._configure_data_path) and adds the Glue-specific catalog type,
+    mirroring how _build_rest_config / _build_postgres_config work.
+    """
+    return settings.ICEBERG_STORAGE_OPTIONS | {"type": "glue"}
