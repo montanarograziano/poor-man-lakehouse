@@ -22,6 +22,7 @@ from pyiceberg.table import Table  # noqa: TC002
 
 from poor_man_lakehouse.catalog import LakehouseCatalogType, get_catalog
 from poor_man_lakehouse.config import settings
+from poor_man_lakehouse.maintenance import TableMaintenance  # noqa: TC002
 
 SQLEngine = Literal["pyspark", "duckdb"]
 WriteMode = Literal["append", "overwrite"]
@@ -527,6 +528,20 @@ class LakehouseConnection:
         exists_clause = "IF EXISTS " if if_exists else ""
         self.duckdb_connection.raw_sql(f"DROP TABLE {exists_clause}{fqn}")
         logger.info(f"Dropped table {fqn}")
+
+    # -- Maintenance --
+
+    def maintenance(self, namespace: str, table_name: str) -> TableMaintenance:
+        """Get a maintenance helper for an Iceberg table.
+
+        Args:
+            namespace: The namespace containing the table.
+            table_name: The table name.
+
+        Returns:
+            TableMaintenance instance bound to the loaded table.
+        """
+        return TableMaintenance(self.load_table(namespace, table_name))
 
     # -- Lifecycle --
 
